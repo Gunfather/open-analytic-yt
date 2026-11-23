@@ -12,6 +12,33 @@ import {
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
+type AiProviderType = 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter' | 'nvidia';
+
+const PROVIDER_MODELS: Record<AiProviderType, string[]> = {
+  gemini: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'],
+  openai: ['gpt-4o-mini', 'gpt-4o', 'o3-mini'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  groq: [
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+    'deepseek-r1-distill-llama-70b',
+    'mixtral-8x7b-32768',
+  ],
+  openrouter: [
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'deepseek/deepseek-r1:free',
+    'google/gemini-2.0-flash-001',
+    'anthropic/claude-3.5-sonnet',
+    'openai/gpt-4o-mini',
+  ],
+  nvidia: [
+    'meta/llama-3.3-70b-instruct',
+    'deepseek-ai/deepseek-r1',
+    'qwen/qwen2.5-72b-instruct',
+    'mistralai/mistral-large-2-instruct',
+  ],
+};
+
 export function SettingsView() {
   const {
     channels,
@@ -28,11 +55,15 @@ export function SettingsView() {
   } = useStore();
   const [draftKey, setDraftKey] = useState(apiKey);
   const [savedMsg, setSavedMsg] = useState('');
-  const [aiProvider, setAiProvider] = useState<
-    'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter' | 'nvidia'
-  >(aiConfig.provider);
+  const [aiProvider, setAiProvider] = useState<AiProviderType>(aiConfig.provider);
   const [aiKey, setAiKey] = useState(aiConfig.apiKey);
-  const [aiModel, setAiModel] = useState(aiConfig.model || '');
+  const [aiModel, setAiModel] = useState(
+    aiConfig.model || PROVIDER_MODELS[aiConfig.provider][0]
+  );
+  const [isCustomModel, setIsCustomModel] = useState(() => {
+    if (!aiConfig.model) return false;
+    return !PROVIDER_MODELS[aiConfig.provider].includes(aiConfig.model);
+  });
   const [aiSavedMsg, setAiSavedMsg] = useState('');
   const [selectedCsvChannelId, setSelectedCsvChannelId] = useState(
     channels[0]?.id || ''
@@ -206,17 +237,12 @@ export function SettingsView() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <select
             value={aiProvider}
-            onChange={(e) =>
-              setAiProvider(
-                e.target.value as
-                  | 'gemini'
-                  | 'openai'
-                  | 'deepseek'
-                  | 'groq'
-                  | 'openrouter'
-                  | 'nvidia'
-              )
-            }
+            onChange={(e) => {
+              const nextProvider = e.target.value as AiProviderType;
+              setAiProvider(nextProvider);
+              setAiModel(PROVIDER_MODELS[nextProvider][0]);
+              setIsCustomModel(false);
+            }}
             className="px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white focus:outline-none focus:border-purple-500"
           >
             <option value="gemini">Google Gemini</option>
@@ -242,25 +268,38 @@ export function SettingsView() {
           />
         </div>
 
-        <input
-          type="text"
-          placeholder={
-            aiProvider === 'deepseek'
-              ? 'Model (default: deepseek-chat)'
-              : aiProvider === 'groq'
-              ? 'Model (default: llama-3.3-70b-versatile)'
-              : aiProvider === 'openrouter'
-              ? 'Model (default: meta-llama/llama-3.3-70b-instruct:free)'
-              : aiProvider === 'nvidia'
-              ? 'Model (default: meta/llama-3.3-70b-instruct)'
-              : aiProvider === 'openai'
-              ? 'Model (default: gpt-4o-mini)'
-              : 'Model (auto: gemini-2.5-flash)'
-          }
-          value={aiModel}
-          onChange={(e) => setAiModel(e.target.value)}
-          className="w-full px-3.5 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white font-mono-num focus:outline-none focus:border-purple-500"
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <select
+            value={isCustomModel ? '__custom__' : aiModel}
+            onChange={(e) => {
+              if (e.target.value === '__custom__') {
+                setIsCustomModel(true);
+                setAiModel('');
+              } else {
+                setIsCustomModel(false);
+                setAiModel(e.target.value);
+              }
+            }}
+            className="px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white font-mono-num focus:outline-none focus:border-purple-500"
+          >
+            {PROVIDER_MODELS[aiProvider].map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+            <option value="__custom__">Custom model...</option>
+          </select>
+
+          {isCustomModel && (
+            <input
+              type="text"
+              placeholder="Enter custom model ID..."
+              value={aiModel}
+              onChange={(e) => setAiModel(e.target.value)}
+              className="px-3.5 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white font-mono-num focus:outline-none focus:border-purple-500"
+            />
+          )}
+        </div>
 
         <div className="flex items-center justify-between">
           <span className="text-xs text-emerald-400">{aiSavedMsg}</span>

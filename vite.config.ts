@@ -240,7 +240,14 @@ function youtubePublicProxyPlugin(): Plugin {
           }
 
           if (body.provider === 'gemini') {
-            const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+            const defaultGeminiModels = [
+              'gemini-2.5-flash',
+              'gemini-2.0-flash',
+              'gemini-1.5-flash',
+            ];
+            const models = body.model?.trim()
+              ? [body.model.trim(), ...defaultGeminiModels.filter((m) => m !== body.model?.trim())]
+              : defaultGeminiModels;
             let lastError = 'Gemini request failed';
 
             for (const model of models) {
