@@ -24,7 +24,9 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
 
   const [loading, setLoading] = useState(false);
   const [analysisText, setAnalysisText] = useState('');
-  const [usedMode, setUsedMode] = useState<'gemini' | 'openai' | 'local'>('local');
+  const [usedMode, setUsedMode] = useState<
+    'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter' | 'local'
+  >('local');
   const [customQuestion, setCustomQuestion] = useState(
     uiLanguage === 'pt-BR'
       ? 'Quais idiomas e canais têm melhor desempenho e o que devo priorizar agora?'
@@ -210,6 +212,7 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
         body: JSON.stringify({
           provider: aiConfig.provider,
           apiKey: aiConfig.apiKey,
+          model: aiConfig.model,
           prompt,
         }),
       });
@@ -250,6 +253,12 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
                 ? 'Gemini'
                 : usedMode === 'openai'
                 ? 'OpenAI'
+                : usedMode === 'deepseek'
+                ? 'DeepSeek'
+                : usedMode === 'groq'
+                ? 'Groq'
+                : usedMode === 'openrouter'
+                ? 'OpenRouter'
                 : 'Local Analyzer'}
             </span>
           </div>

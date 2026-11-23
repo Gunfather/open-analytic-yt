@@ -226,8 +226,9 @@ function youtubePublicProxyPlugin(): Plugin {
             chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
           }
           const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
-            provider: 'gemini' | 'openai';
+            provider: 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter';
             apiKey: string;
+            model?: string;
             prompt: string;
           };
 
@@ -274,15 +275,40 @@ function youtubePublicProxyPlugin(): Plugin {
             return;
           }
 
-          // OpenAI
-          const oaRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          // OpenAI-compatible providers: OpenAI, DeepSeek, Groq, OpenRouter
+          const providerEndpoints: Record<
+            'openai' | 'deepseek' | 'groq' | 'openrouter',
+            { url: string; defaultModel: string }
+          > = {
+            openai: {
+              url: 'https://api.openai.com/v1/chat/completions',
+              defaultModel: 'gpt-4o-mini',
+            },
+            deepseek: {
+              url: 'https://api.deepseek.com/chat/completions',
+              defaultModel: 'deepseek-chat',
+            },
+            groq: {
+              url: 'https://api.groq.com/openai/v1/chat/completions',
+              defaultModel: 'llama-3.3-70b-versatile',
+            },
+            openrouter: {
+              url: 'https://openrouter.ai/api/v1/chat/completions',
+              defaultModel: 'meta-llama/llama-3.3-70b-instruct:free',
+            },
+          };
+
+          const cfg = providerEndpoints[body.provider];
+          const chosenModel = body.model?.trim() || cfg.defaultModel;
+
+          const oaRes = await fetch(cfg.url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${body.apiKey}`,
             },
             body: JSON.stringify({
-              model: 'gpt-4o-mini',
+              model: chosenModel,
               messages: [{ role: 'user', content: body.prompt }],
             }),
           });
@@ -295,13 +321,15 @@ function youtubePublicProxyPlugin(): Plugin {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
             res.end(
-              JSON.stringify({ error: oaData.error?.message || `OpenAI HTTP ${oaRes.status}` })
+              JSON.stringify({
+                error: oaData.error?.message || `${body.provider} HTTP ${oaRes.status}`,
+              })
             );
             return;
           }
 
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ ok: true, text: oaText, model: 'gpt-4o-mini' }));
+          res.end(JSON.stringify({ ok: true, text: oaText, model: chosenModel }));
         } catch (err) {
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');

@@ -28,8 +28,11 @@ export function SettingsView() {
   } = useStore();
   const [draftKey, setDraftKey] = useState(apiKey);
   const [savedMsg, setSavedMsg] = useState('');
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'openai'>(aiConfig.provider);
+  const [aiProvider, setAiProvider] = useState<
+    'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter'
+  >(aiConfig.provider);
   const [aiKey, setAiKey] = useState(aiConfig.apiKey);
+  const [aiModel, setAiModel] = useState(aiConfig.model || '');
   const [aiSavedMsg, setAiSavedMsg] = useState('');
   const [selectedCsvChannelId, setSelectedCsvChannelId] = useState(
     channels[0]?.id || ''
@@ -46,7 +49,7 @@ export function SettingsView() {
 
   const handleSaveAi = (e: React.FormEvent) => {
     e.preventDefault();
-    setAiConfig({ provider: aiProvider, apiKey: aiKey });
+    setAiConfig({ provider: aiProvider, apiKey: aiKey, model: aiModel });
     setAiSavedMsg('AI configuration saved locally!');
     setTimeout(() => setAiSavedMsg(''), 3000);
   };
@@ -203,11 +206,18 @@ export function SettingsView() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <select
             value={aiProvider}
-            onChange={(e) => setAiProvider(e.target.value as 'gemini' | 'openai')}
+            onChange={(e) =>
+              setAiProvider(
+                e.target.value as 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter'
+              )
+            }
             className="px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white focus:outline-none focus:border-purple-500"
           >
             <option value="gemini">Google Gemini</option>
             <option value="openai">OpenAI (GPT)</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="groq">Groq</option>
+            <option value="openrouter">OpenRouter</option>
           </select>
 
           <input
@@ -218,6 +228,24 @@ export function SettingsView() {
             className="sm:col-span-2 px-3.5 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white font-mono-num focus:outline-none focus:border-purple-500"
           />
         </div>
+
+        <input
+          type="text"
+          placeholder={
+            aiProvider === 'deepseek'
+              ? 'Model (default: deepseek-chat)'
+              : aiProvider === 'groq'
+              ? 'Model (default: llama-3.3-70b-versatile)'
+              : aiProvider === 'openrouter'
+              ? 'Model (default: meta-llama/llama-3.3-70b-instruct:free)'
+              : aiProvider === 'openai'
+              ? 'Model (default: gpt-4o-mini)'
+              : 'Model (auto: gemini-2.5-flash)'
+          }
+          value={aiModel}
+          onChange={(e) => setAiModel(e.target.value)}
+          className="w-full px-3.5 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white font-mono-num focus:outline-none focus:border-purple-500"
+        />
 
         <div className="flex items-center justify-between">
           <span className="text-xs text-emerald-400">{aiSavedMsg}</span>

@@ -38,8 +38,9 @@ interface PersistedState {
   videos: VideoItem[];
   apiKey: string;
   aiConfig?: {
-    provider: 'gemini' | 'openai';
+    provider: 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter';
     apiKey: string;
+    model?: string;
   };
   scheduledTasks?: ScheduledTask[];
   smtpConfig?: SmtpConfig;
@@ -110,8 +111,12 @@ interface StoreContextValue {
   deleteScheduledTask: (id: string) => void;
   toggleScheduledTask: (id: string) => void;
   runScheduledTaskNow: (id: string) => Promise<{ ok: boolean; message: string }>;
-  aiConfig: { provider: 'gemini' | 'openai'; apiKey: string };
-  setAiConfig: (cfg: { provider: 'gemini' | 'openai'; apiKey: string }) => void;
+  aiConfig: { provider: 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter'; apiKey: string; model?: string };
+  setAiConfig: (cfg: {
+    provider: 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter';
+    apiKey: string;
+    model?: string;
+  }) => void;
   exportBackupJson: () => string;
   importBackupJson: (jsonText: string) => { ok: boolean; message: string };
   resetDemoData: () => void;
@@ -913,10 +918,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearInterval(id);
   }, [state.scheduledTasks]);
 
-  const setAiConfig = (cfg: { provider: 'gemini' | 'openai'; apiKey: string }) => {
+  const setAiConfig = (cfg: {
+    provider: 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter';
+    apiKey: string;
+    model?: string;
+  }) => {
     setState((prev) => ({
       ...prev,
-      aiConfig: { provider: cfg.provider, apiKey: cfg.apiKey.trim() },
+      aiConfig: {
+        provider: cfg.provider,
+        apiKey: cfg.apiKey.trim(),
+        model: cfg.model?.trim() || undefined,
+      },
     }));
   };
 
