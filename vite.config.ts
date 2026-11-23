@@ -213,6 +213,105 @@ function youtubePublicProxyPlugin(): Plugin {
           );
         }
       });
+
+      server.middlewares.use('/api/ai-analyze', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method not allowed' }));
+          return;
+        }
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          }
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+            provider: 'gemini' | 'openai';
+            apiKey: string;
+            prompt: string;
+          };
+
+          if (!body.apiKey) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'API key missing' }));
+            return;
+          }
+
+          if (body.provider === 'gemini') {
+            const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+            let lastError = 'Gemini request failed';
+
+            for (const model of models) {
+              const apiRes = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
+                  body.apiKey
+                )}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: body.prompt }] }],
+                  }),
+                }
+              );
+              const data = (await apiRes.json()) as {
+                candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+                error?: { message?: string };
+              };
+              const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (apiRes.ok && text) {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ ok: true, text, model }));
+                return;
+              }
+              lastError = data.error?.message || `HTTP ${apiRes.status}`;
+            }
+
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: lastError }));
+            return;
+          }
+
+          // OpenAI
+          const oaRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${body.apiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{ role: 'user', content: body.prompt }],
+            }),
+          });
+          const oaData = (await oaRes.json()) as {
+            choices?: Array<{ message?: { content?: string } }>;
+            error?: { message?: string };
+          };
+          const oaText = oaData.choices?.[0]?.message?.content;
+          if (!oaRes.ok || !oaText) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(
+              JSON.stringify({ error: oaData.error?.message || `OpenAI HTTP ${oaRes.status}` })
+            );
+            return;
+          }
+
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, text: oaText, model: 'gpt-4o-mini' }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              error: err instanceof Error ? err.message : 'AI proxy error',
+            })
+          );
+        }
+      });
     },
   };
 }

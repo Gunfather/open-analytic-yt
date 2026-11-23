@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Flame, RefreshCw, Sparkles, X } from 'lucide-react';
+import { Flame, RefreshCw, Settings, Sparkles, X } from 'lucide-react';
 import { PERIOD_DAYS, useStore } from '../context/StoreContext';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 
@@ -18,13 +18,17 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
     period,
     aggregatedKpis,
     aiConfig,
+    uiLanguage,
+    setActiveTab,
   } = useStore();
 
   const [loading, setLoading] = useState(false);
   const [analysisText, setAnalysisText] = useState('');
   const [usedMode, setUsedMode] = useState<'gemini' | 'openai' | 'local'>('local');
   const [customQuestion, setCustomQuestion] = useState(
-    'Which languages and channels are performing best, and what should I prioritize next?'
+    uiLanguage === 'pt-BR'
+      ? 'Quais idiomas e canais têm melhor desempenho e o que devo priorizar agora?'
+      : 'Which languages and channels are performing best, and what should I prioritize next?'
   );
 
   const summaryPayload = useMemo(() => {
@@ -62,7 +66,7 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
     const topVideos = videos
       .filter((v) => chMap.has(v.channelId) && v.publishedAt >= startStr)
       .sort((a, b) => b.views - a.views)
-      .slice(0, 8)
+      .slice(0, 10)
       .map((v) => ({
         title: v.title,
         channel: chMap.get(v.channelId)?.name,
@@ -83,57 +87,97 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
     };
   }, [filteredChannels, languages, groups, metrics, videos, period, aggregatedKpis]);
 
-  const buildLocalDiagnostics = () => {
+  const buildLocalDiagnostics = (question: string) => {
+    const q = question.toLowerCase();
     const sorted = [...summaryPayload.channels].sort((a, b) => b.views - a.views);
     const topCh = sorted[0];
     const lowestCtr = [...summaryPayload.channels].sort((a, b) => a.ctr - b.ctr)[0];
+    const bestCtr = [...summaryPayload.channels].sort((a, b) => b.ctr - a.ctr)[0];
     const bestVideo = summaryPayload.topVideos[0];
 
-    const byLang = new Map<string, number>();
+    const byLang = new Map<string, { views: number; revenue: number }>();
     for (const c of summaryPayload.channels) {
-      byLang.set(c.language, (byLang.get(c.language) || 0) + c.views);
+      const cur = byLang.get(c.language) || { views: 0, revenue: 0 };
+      cur.views += c.views;
+      cur.revenue += c.revenue;
+      byLang.set(c.language, cur);
     }
-    const topLang = Array.from(byLang.entries()).sort((a, b) => b[1] - a[1])[0];
+    const sortedLangs = Array.from(byLang.entries()).sort((a, b) => b[1].views - a[1].views);
+    const topLang = sortedLangs[0];
 
-    const lines = [
-      `📊 Executive Summary (${period})`,
-      `• Total Views: ${formatNumber(summaryPayload.totalViews)} (${
+    const isPt = uiLanguage === 'pt-BR';
+
+    const lines: string[] = [
+      isPt
+        ? `📊 Resumo (${period}) · ${filteredChannels.length} canal(is)`
+        : `📊 Summary (${period}) · ${filteredChannels.length} channel(s)`,
+      `• Views: ${formatNumber(summaryPayload.totalViews)} (${
         summaryPayload.viewsDeltaPct >= 0 ? '+' : ''
-      }${summaryPayload.viewsDeltaPct}% vs previous period)`,
-      `• Watch Time: ${summaryPayload.watchTimeHours}h | New Subscribers: +${formatNumber(
-        summaryPayload.subscribers
-      )} | Est. Revenue: ${formatCurrency(summaryPayload.estimatedRevenue)}`,
+      }${summaryPayload.viewsDeltaPct}%) | Watch Time: ${summaryPayload.watchTimeHours}h | Est. Revenue: ${formatCurrency(
+        summaryPayload.estimatedRevenue
+      )}`,
       '',
-      '🏆 Key Highlights',
-      topCh
-        ? `• Top Channel: ${topCh.name} (${topCh.language}) with ${formatNumber(
-            topCh.views
-          )} views and ${topCh.ctr.toFixed(1)}% CTR.`
-        : '• No active channels in current filter.',
-      topLang
-        ? `• Strongest Language: ${topLang[0]} (${formatNumber(
-            topLang[1]
-          )} views across channels in this language).`
-        : '',
-      bestVideo
-        ? `• Top Video: "${bestVideo.title}" (${formatNumber(
-            bestVideo.views
-          )} views, ${formatNumber(bestVideo.likes)} likes, ${formatNumber(
-            bestVideo.comments
-          )} comments).`
-        : '',
-      '',
-      '🎯 Actionable Recommendations',
-      lowestCtr
-        ? `• Thumbnail / Title Opportunity: "${lowestCtr.name}" has the lowest CTR (${lowestCtr.ctr.toFixed(
-            1
-          )}%). Test high-contrast thumbnails or curiosity hooks similar to your top performer.`
-        : '',
-      '• Cross-Language Scaling: Replicate your top-performing video formats across all active languages within 24-48h to maximize regional reach.',
-      '',
-      '💡 Tip: Add a free Gemini or OpenAI API key in Settings & API for deeper custom natural-language analysis.',
     ];
-    return lines.filter(Boolean).join('\n');
+
+    if (q.includes('ctr') || q.includes('click') || q.includes('thumb')) {
+      lines.push(isPt ? '🎯 Análise de CTR:' : '🎯 CTR Breakdown:');
+      if (bestCtr) {
+        lines.push(
+          `• ${isPt ? 'Melhor CTR' : 'Highest CTR'}: ${bestCtr.name} (${bestCtr.ctr.toFixed(1)}%)`
+        );
+      }
+      if (lowestCtr) {
+        lines.push(
+          `• ${isPt ? 'Menor CTR' : 'Lowest CTR'}: ${lowestCtr.name} (${lowestCtr.ctr.toFixed(
+            1
+          )}%) — ${
+            isPt
+              ? 'teste novas thumbnails com mais contraste.'
+              : 'test higher-contrast thumbnails and stronger curiosity hooks.'
+          }`
+        );
+      }
+      lines.push('');
+    }
+
+    if (q.includes('lang') || q.includes('idiom') || q.includes('lingua')) {
+      lines.push(isPt ? '🌍 Ranking por Idioma:' : '🌍 Language Ranking:');
+      sortedLangs.forEach(([langName, stats], i) => {
+        lines.push(
+          `${i + 1}. ${langName}: ${formatNumber(stats.views)} views · ${formatCurrency(
+            stats.revenue
+          )}`
+        );
+      });
+      lines.push('');
+    }
+
+    lines.push(isPt ? '🏆 Principais Destaques:' : '🏆 Key Highlights:');
+    if (topCh) {
+      lines.push(
+        `• ${isPt ? 'Canal líder' : 'Top Channel'}: ${topCh.name} (${topCh.language}) — ${formatNumber(
+          topCh.views
+        )} views, CTR ${topCh.ctr.toFixed(1)}%`
+      );
+    }
+    if (topLang) {
+      lines.push(
+        `• ${isPt ? 'Idioma mais forte' : 'Strongest Language'}: ${topLang[0]} (${formatNumber(
+          topLang[1].views
+        )} views)`
+      );
+    }
+    if (bestVideo) {
+      lines.push(
+        `• ${isPt ? 'Vídeo #1' : 'Top Video'}: "${bestVideo.title}" (${formatNumber(
+          bestVideo.views
+        )} views, ${formatNumber(bestVideo.likes)} likes, ${formatNumber(
+          bestVideo.comments
+        )} comments)`
+      );
+    }
+
+    return lines.join('\n');
   };
 
   const runAnalysis = async () => {
@@ -141,68 +185,48 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
     try {
       if (!aiConfig.apiKey) {
         setUsedMode('local');
-        setAnalysisText(buildLocalDiagnostics());
+        setAnalysisText(buildLocalDiagnostics(customQuestion));
         return;
       }
 
-      const prompt = `You are a YouTube multi-channel growth strategist. Analyze the following JSON metrics and answer concisely with bullet points and actionable recommendations.\n\nUser Question: ${customQuestion}\n\nData:\n${JSON.stringify(
+      const langInstruction =
+        uiLanguage === 'pt-BR'
+          ? 'Respond in Portuguese (PT-BR).'
+          : uiLanguage === 'fr'
+          ? 'Respond in French.'
+          : uiLanguage === 'es'
+          ? 'Respond in Spanish.'
+          : 'Respond in English.';
+
+      const prompt = `You are a YouTube multi-channel growth strategist. ${langInstruction} Analyze the following JSON metrics and answer concisely with bullet points and actionable recommendations.\n\nUser Question: ${customQuestion}\n\nData:\n${JSON.stringify(
         summaryPayload,
         null,
         2
       )}`;
 
-      if (aiConfig.provider === 'gemini') {
-        setUsedMode('gemini');
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(
-            aiConfig.apiKey
-          )}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-            }),
-          }
-        );
-        const data = (await res.json()) as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-          error?: { message?: string };
-        };
-        if (!res.ok || data.error) {
-          throw new Error(data.error?.message || `Gemini API HTTP ${res.status}`);
-        }
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        setAnalysisText(text || buildLocalDiagnostics());
-      } else {
-        setUsedMode('openai');
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${aiConfig.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: prompt }],
-          }),
-        });
-        const data = (await res.json()) as {
-          choices?: Array<{ message?: { content?: string } }>;
-          error?: { message?: string };
-        };
-        if (!res.ok || data.error) {
-          throw new Error(data.error?.message || `OpenAI API HTTP ${res.status}`);
-        }
-        const text = data.choices?.[0]?.message?.content;
-        setAnalysisText(text || buildLocalDiagnostics());
+      const res = await fetch('/api/ai-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: aiConfig.provider,
+          apiKey: aiConfig.apiKey,
+          prompt,
+        }),
+      });
+
+      const data = (await res.json()) as { ok?: boolean; text?: string; error?: string };
+      if (!res.ok || !data.ok || !data.text) {
+        throw new Error(data.error || `HTTP ${res.status}`);
       }
+
+      setUsedMode(aiConfig.provider);
+      setAnalysisText(data.text);
     } catch (err) {
       setUsedMode('local');
       setAnalysisText(
-        `⚠️ Cloud AI call failed (${
-          err instanceof Error ? err.message : 'Unknown error'
-        }). Falling back to local diagnostics:\n\n${buildLocalDiagnostics()}`
+        `⚠️ ${
+          err instanceof Error ? err.message : 'AI request error'
+        }\n\n${buildLocalDiagnostics(customQuestion)}`
       );
     } finally {
       setLoading(false);
@@ -238,11 +262,34 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
         </div>
 
         <div className="p-5 space-y-4 flex-1 overflow-y-auto">
+          {!aiConfig.apiKey && (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-3.5 py-2.5 flex items-center justify-between gap-3 text-xs text-amber-200">
+              <span>
+                {uiLanguage === 'pt-BR'
+                  ? 'Sem chave Gemini/OpenAI configurada — usando resumo automático local.'
+                  : 'No Gemini/OpenAI key configured — using local summary diagnostics.'}
+              </span>
+              <button
+                onClick={() => {
+                  onClose();
+                  setActiveTab('settings');
+                }}
+                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold cursor-pointer"
+              >
+                <Settings className="w-3 h-3" />
+                {uiLanguage === 'pt-BR' ? 'Configurar IA' : 'Setup AI Key'}
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <input
               type="text"
               value={customQuestion}
               onChange={(e) => setCustomQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void runAnalysis();
+              }}
               className="flex-1 px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white focus:outline-none focus:border-purple-500"
             />
             <button
