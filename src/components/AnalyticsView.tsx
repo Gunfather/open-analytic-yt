@@ -15,7 +15,7 @@ import { formatCompact, formatCurrency, formatHours, formatNumber } from '../uti
 import { VideoPerformanceScatter } from './VideoPerformanceScatter';
 
 export function AnalyticsView() {
-  const { channels, filteredChannels, languages, metrics, videos, period } = useStore();
+  const { channels, filteredChannels, languages, metrics, videos, period, t } = useStore();
   const days = PERIOD_DAYS[period];
 
   const crossLanguageTopics = useMemo(() => {
@@ -128,10 +128,10 @@ export function AnalyticsView() {
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Languages className="w-5 h-5 text-sky-400" />
-              Cross-Language Performance (Same Publish Date)
+              {t('crossLangTitle')}
             </h2>
             <p className="text-xs text-slate-400">
-              Compare how videos published on the same day performed across different languages.
+              {t('crossLangSubtitle')}
             </p>
           </div>
 
@@ -186,10 +186,10 @@ export function AnalyticsView() {
       <div>
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-orange-400" />
-          Comparativo por Idioma ({period})
+          {t('langCompTitle')} ({period})
         </h2>
         <p className="text-xs text-slate-400">
-          Desempenho agregado dos seus canais agrupado por idioma — compare alcance, retenção e monetização.
+          {t('langCompSubtitle')}
         </p>
       </div>
 
@@ -251,7 +251,7 @@ export function AnalyticsView() {
         <div className="rounded-2xl bg-[#121720] border border-slate-800/90 p-5">
           <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
             <Globe2 className="w-4 h-4 text-orange-400" />
-            Views por Idioma
+            {t('viewsByLang')}
           </h3>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -284,7 +284,7 @@ export function AnalyticsView() {
         <div className="rounded-2xl bg-[#121720] border border-slate-800/90 p-5">
           <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
             <Globe2 className="w-4 h-4 text-emerald-400" />
-            Receita Estimada por Idioma (USD)
+            {t('revByLang')}
           </h3>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
