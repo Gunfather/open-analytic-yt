@@ -28,6 +28,9 @@ export function ChannelsView() {
     addLanguage,
     addGroup,
     deleteGroup,
+    selectedLanguageId,
+    selectedGroupId,
+    selectedChannelId,
     t,
   } = useStore();
 
@@ -89,6 +92,13 @@ export function ChannelsView() {
 
   const langMap = new Map(languages.map((l) => [l.id, l]));
   const groupMap = new Map(groups.map((g) => [g.id, g]));
+
+  const visibleChannels = channels.filter((ch) => {
+    if (selectedLanguageId !== 'all' && ch.languageId !== selectedLanguageId) return false;
+    if (selectedGroupId !== 'all' && ch.groupId !== selectedGroupId) return false;
+    if (selectedChannelId !== 'all' && ch.id !== selectedChannelId) return false;
+    return true;
+  });
 
   const openNewChannelForm = () => {
     setEditingChannelId(null);
@@ -319,7 +329,8 @@ export function ChannelsView() {
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Tv2 className="w-5 h-5 text-orange-400" />
-            {t('connectedChannels')} ({channels.length})
+            {t('connectedChannels')} ({visibleChannels.length}
+            {visibleChannels.length !== channels.length ? ` / ${channels.length}` : ''})
           </h2>
           <p className="text-xs text-slate-400">
             {t('navChannels')}
@@ -1006,7 +1017,7 @@ export function ChannelsView() {
 
       {/* Channels Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {channels.map((ch) => {
+        {visibleChannels.map((ch) => {
           const lang = langMap.get(ch.languageId);
           const grp = ch.groupId ? groupMap.get(ch.groupId) : undefined;
           return (
