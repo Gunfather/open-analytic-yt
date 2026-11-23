@@ -42,7 +42,7 @@ npm run dev
 ```
 
 Open `http://localhost:5173` in your browser.  
-*(On Windows, you can also double-click `iniciar-pulseyt.bat` to install dependencies if needed, start the server, and open your browser automatically.)*
+*(On Windows, you can also double-click `start_open-analytic-yt.bat` to install dependencies if needed, start the server, and open your browser automatically.)*
 
 ### 2. Adding Your Channels (No API Key Required)
 
@@ -67,7 +67,7 @@ Open `http://localhost:5173` in your browser.
 1. Open **Scheduled Tasks** in the left sidebar.
 2. Click **Configure Email (SMTP)** and enter your SMTP credentials (for Gmail, use an [App Password](https://myaccount.google.com/apppasswords)).
 3. Click **New Scheduled Task**, choose the recipient email, frequency (`Daily`, `Weekly`, `Monthly`, or `Specific Date`), exact time, and report filters.
-4. Keep the local server running (`npm run dev` or `iniciar-pulseyt.bat`) for automatic background dispatch, or click **Send Now** to test immediately.
+4. Keep the local server running (`npm run dev` or `start_open-analytic-yt.bat`) for automatic background dispatch, or click **Send Now** to test immediately.
 
 ---
 
