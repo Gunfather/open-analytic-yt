@@ -9,7 +9,7 @@ import {
 } from '../utils/formatters';
 
 export function VideosView() {
-  const { filteredChannels, languages, videos, isSyncing, syncAllChannels } = useStore();
+  const { filteredChannels, languages, videos, isSyncing, syncAllChannels, t } = useStore();
   const [search, setSearch] = useState('');
   const [formatFilter, setFormatFilter] = useState<'all' | 'shorts' | 'long'>('all');
   const [sortBy, setSortBy] = useState<'publishedAt' | 'views' | 'comments' | 'revenue'>('publishedAt');
@@ -45,7 +45,7 @@ export function VideosView() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
           <PlaySquare className="w-5 h-5 text-orange-400" />
-          Vídeos Publicados ({filteredVideos.length})
+          {t('tabVideos')} ({filteredVideos.length})
         </h2>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -53,7 +53,7 @@ export function VideosView() {
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Buscar título..."
+              placeholder={t('searchTitle')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-3 py-1.5 rounded-xl bg-[#121720] border border-slate-800 text-xs text-white focus:outline-none focus:border-orange-500"
@@ -65,9 +65,9 @@ export function VideosView() {
             onChange={(e) => setFormatFilter(e.target.value as 'all' | 'shorts' | 'long')}
             className="px-3 py-1.5 rounded-xl bg-[#121720] border border-slate-800 text-xs text-white focus:outline-none cursor-pointer"
           >
-            <option value="all">Todos os Formatos</option>
-            <option value="shorts">Apenas Shorts</option>
-            <option value="long">Vídeos Longos</option>
+            <option value="all">{t('allFormats')}</option>
+            <option value="shorts">{t('shortsOnly')}</option>
+            <option value="long">{t('longVideos')}</option>
           </select>
 
           <select
@@ -75,10 +75,10 @@ export function VideosView() {
             onChange={(e) => setSortBy(e.target.value as 'publishedAt' | 'views' | 'comments' | 'revenue')}
             className="px-3 py-1.5 rounded-xl bg-[#121720] border border-slate-800 text-xs text-white focus:outline-none cursor-pointer"
           >
-            <option value="publishedAt">Mais Recentes</option>
-            <option value="views">Mais Views</option>
-            <option value="comments">Mais Comentários</option>
-            <option value="revenue">Maior Receita</option>
+            <option value="publishedAt">{t('mostRecent')}</option>
+            <option value="views">{t('mostViews')}</option>
+            <option value="comments">{t('mostComments')}</option>
+            <option value="revenue">{t('highestRevenue')}</option>
           </select>
 
           <button
@@ -87,7 +87,7 @@ export function VideosView() {
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition cursor-pointer disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Carregando...' : 'Carregar Vídeos'}
+            {isSyncing ? t('syncingBtn') : t('loadVideos')}
           </button>
         </div>
       </div>

@@ -424,6 +424,28 @@ export function DashboardView() {
       });
   }, [filteredChannels, languages, videos, days]);
 
+  const viralSpikes = useMemo(() => {
+    if (enrichedPeriodVideos.length === 0) return [];
+    const channelStats = new Map<string, { sum: number; count: number }>();
+    for (const item of enrichedPeriodVideos) {
+      const cur = channelStats.get(item.channel.id) || { sum: 0, count: 0 };
+      cur.sum += item.video.views;
+      cur.count += 1;
+      channelStats.set(item.channel.id, cur);
+    }
+
+    return enrichedPeriodVideos
+      .map((item) => {
+        const stats = channelStats.get(item.channel.id);
+        const avg = stats && stats.count > 0 ? stats.sum / stats.count : 0;
+        const multiplier = avg > 0 ? Number((item.video.views / avg).toFixed(1)) : 1;
+        return { ...item, multiplier };
+      })
+      .filter((item) => item.multiplier >= 2.0 && item.video.views >= 50)
+      .sort((a, b) => b.multiplier - a.multiplier)
+      .slice(0, 4);
+  }, [enrichedPeriodVideos]);
+
   const topVideos = useMemo(
     () => [...enrichedPeriodVideos].sort((a, b) => b.video.views - a.video.views).slice(0, 12),
     [enrichedPeriodVideos]
@@ -842,6 +864,45 @@ export function DashboardView() {
           >
             {t('addChannel')}
           </button>
+        </div>
+      )}
+
+      {viralSpikes.length > 0 && (
+        <div className="rounded-2xl bg-gradient-to-r from-orange-500/10 via-[#121720] to-amber-500/10 border border-orange-500/35 p-4 space-y-2.5">
+          <div className="text-xs font-bold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+            🔥 Viral Spike Radar ({viralSpikes.length})
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            {viralSpikes.map((item) => (
+              <div
+                key={item.video.id}
+                className="rounded-xl bg-[#0b0f14]/90 border border-slate-800 p-3 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  {item.youtubeUrl ? (
+                    <a
+                      href={item.youtubeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-white hover:text-orange-400 truncate block"
+                    >
+                      {item.video.title}
+                    </a>
+                  ) : (
+                    <div className="text-xs font-semibold text-white truncate">
+                      {item.video.title}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-slate-400 truncate">
+                    {item.language?.flag} {item.channel.name} · {formatCompact(item.video.views)} views
+                  </div>
+                </div>
+                <span className="shrink-0 px-2 py-1 rounded-lg bg-orange-500/20 text-orange-300 border border-orange-500/40 font-mono-num text-xs font-bold">
+                  {item.multiplier}x
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

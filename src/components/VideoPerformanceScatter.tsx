@@ -79,7 +79,7 @@ function renderNumberedDot(fill: string) {
 }
 
 export function VideoPerformanceScatter() {
-  const { filteredChannels, languages, videos } = useStore();
+  const { filteredChannels, languages, videos, t } = useStore();
 
   const [sinceMode, setSinceMode] = useState<SincePublishMode>('24h');
   const [publishWindow, setPublishWindow] = useState<PublishWindowDays>(90);
@@ -223,7 +223,7 @@ export function VideoPerformanceScatter() {
       <div className="px-5 py-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-base font-bold text-white flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-purple-400" />
-          Modo Avançado · Desempenho do vídeo ({SINCE_LABELS[sinceMode]})
+          {t('advancedModeTitle')} ({SINCE_LABELS[sinceMode]})
         </h2>
 
         <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">

@@ -49,6 +49,7 @@ export function ScheduledTasksView() {
     deleteScheduledTask,
     toggleScheduledTask,
     runScheduledTaskNow,
+    t,
   } = useStore();
 
   const [showSmtp, setShowSmtp] = useState(!smtpConfig.user || !smtpConfig.pass);
@@ -206,10 +207,10 @@ export function ScheduledTasksView() {
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <CalendarClock className="w-5 h-5 text-orange-400" />
-            Tarefas Agendadas de Relatórios por E-mail ({scheduledTasks.length})
+            {t('scheduledTitle')} ({scheduledTasks.length})
           </h2>
           <p className="text-xs text-slate-400">
-            Agende envios automáticos em PDF com todos os filtros (período, idioma, grupo, canal, dias e horas). Mantenha o painel aberto para disparo automático.
+            {t('tabScheduled')}
           </p>
         </div>
 
@@ -219,7 +220,7 @@ export function ScheduledTasksView() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#131a24] hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
           >
             <Settings2 className="w-4 h-4 text-sky-400" />
-            Configurar E-mail (SMTP)
+            {t('configSmtp')}
           </button>
 
           <button
@@ -227,7 +228,7 @@ export function ScheduledTasksView() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold shadow-lg shadow-orange-500/20 transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            Nova Tarefa Agendada
+            {t('newScheduledTask')}
           </button>
         </div>
       </div>
@@ -706,7 +707,7 @@ export function ScheduledTasksView() {
                       }`}
                     >
                       <Power className="w-3.5 h-3.5" />
-                      {task.isActive ? 'Ativa · Desativar' : 'Desativada · Ativar'}
+                      {task.isActive ? t('activeDisable') : t('disabledEnable')}
                     </button>
 
                     <button
@@ -715,7 +716,7 @@ export function ScheduledTasksView() {
                       className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 transition cursor-pointer disabled:opacity-50"
                     >
                       <Send className="w-3.5 h-3.5" />
-                      {runningTaskId === task.id ? 'Enviando...' : 'Enviar Agora'}
+                      {runningTaskId === task.id ? t('sending') : t('sendNow')}
                     </button>
                   </div>
 

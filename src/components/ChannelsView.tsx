@@ -28,6 +28,7 @@ export function ChannelsView() {
     addLanguage,
     addGroup,
     deleteGroup,
+    t,
   } = useStore();
 
   const [showAddChannel, setShowAddChannel] = useState(false);
@@ -318,10 +319,10 @@ export function ChannelsView() {
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Tv2 className="w-5 h-5 text-orange-400" />
-            Canais Conectados ({channels.length})
+            {t('connectedChannels')} ({channels.length})
           </h2>
           <p className="text-xs text-slate-400">
-            Gerencie seus canais atuais e adicione novos canais ou idiomas a qualquer momento.
+            {t('navChannels')}
           </p>
         </div>
 
@@ -331,7 +332,7 @@ export function ChannelsView() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#131a24] hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
           >
             <FolderPlus className="w-4 h-4 text-violet-400" />
-            + Novo Grupo
+            {t('newGroup')}
           </button>
 
           <button
@@ -339,7 +340,7 @@ export function ChannelsView() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#131a24] hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
           >
             <Globe2 className="w-4 h-4 text-sky-400" />
-            + Novo Idioma
+            {t('newLanguage')}
           </button>
 
           <button
@@ -347,7 +348,7 @@ export function ChannelsView() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold shadow-lg shadow-orange-500/20 transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            Adicionar Canal
+            {t('addChannel')}
           </button>
         </div>
       </div>
@@ -1088,7 +1089,7 @@ export function ChannelsView() {
                     }`}
                   >
                     <Power className="w-3.5 h-3.5" />
-                    {ch.isActive ? 'Ativo' : 'Pausado'}
+                    {ch.isActive ? t('active') : t('paused')}
                   </button>
 
                   <a
@@ -1120,7 +1121,7 @@ export function ChannelsView() {
                     className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition"
                   >
                     <Plus className="w-3.5 h-3.5 text-orange-400" />
-                    Criar
+                    {t('createBtn')}
                   </a>
                 </div>
 

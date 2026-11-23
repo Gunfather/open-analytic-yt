@@ -37,6 +37,10 @@ interface PersistedState {
   metrics: DailyMetric[];
   videos: VideoItem[];
   apiKey: string;
+  aiConfig?: {
+    provider: 'gemini' | 'openai';
+    apiKey: string;
+  };
   scheduledTasks?: ScheduledTask[];
   smtpConfig?: SmtpConfig;
 }
@@ -106,6 +110,10 @@ interface StoreContextValue {
   deleteScheduledTask: (id: string) => void;
   toggleScheduledTask: (id: string) => void;
   runScheduledTaskNow: (id: string) => Promise<{ ok: boolean; message: string }>;
+  aiConfig: { provider: 'gemini' | 'openai'; apiKey: string };
+  setAiConfig: (cfg: { provider: 'gemini' | 'openai'; apiKey: string }) => void;
+  exportBackupJson: () => string;
+  importBackupJson: (jsonText: string) => { ok: boolean; message: string };
   resetDemoData: () => void;
 }
 
@@ -905,6 +913,61 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearInterval(id);
   }, [state.scheduledTasks]);
 
+  const setAiConfig = (cfg: { provider: 'gemini' | 'openai'; apiKey: string }) => {
+    setState((prev) => ({
+      ...prev,
+      aiConfig: { provider: cfg.provider, apiKey: cfg.apiKey.trim() },
+    }));
+  };
+
+  const exportBackupJson = () => {
+    return JSON.stringify(
+      {
+        version: '1.1.0',
+        exportedAt: new Date().toISOString(),
+        languages: state.languages,
+        groups: state.groups || [],
+        channels: state.channels,
+        metrics: state.metrics,
+        videos: state.videos,
+        scheduledTasks: state.scheduledTasks || [],
+      },
+      null,
+      2
+    );
+  };
+
+  const importBackupJson = (jsonText: string): { ok: boolean; message: string } => {
+    try {
+      const parsed = JSON.parse(jsonText) as Partial<PersistedState>;
+      if (!Array.isArray(parsed.channels) || !Array.isArray(parsed.languages)) {
+        return { ok: false, message: 'Invalid backup file format.' };
+      }
+      setState((prev) => ({
+        ...prev,
+        languages: parsed.languages!,
+        groups: Array.isArray(parsed.groups) ? parsed.groups : [],
+        channels: parsed.channels!,
+        metrics: Array.isArray(parsed.metrics) ? parsed.metrics : [],
+        videos: Array.isArray(parsed.videos) ? parsed.videos : [],
+        scheduledTasks: Array.isArray(parsed.scheduledTasks)
+          ? parsed.scheduledTasks
+          : [],
+      }));
+      setSelectedLanguageId('all');
+      setSelectedGroupId('all');
+      setSelectedChannelId('all');
+      return {
+        ok: true,
+        message: `Imported ${parsed.channels.length} channel(s) and ${
+          (parsed.groups || []).length
+        } group(s).`,
+      };
+    } catch {
+      return { ok: false, message: 'Could not parse JSON backup file.' };
+    }
+  };
+
   const resetDemoData = () => {
     const { metrics, videos } = generateSeedMetricsAndVideos(INITIAL_CHANNELS, 90);
     setState({
@@ -970,6 +1033,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         deleteScheduledTask,
         toggleScheduledTask,
         runScheduledTaskNow,
+        aiConfig: state.aiConfig || { provider: 'gemini', apiKey: '' },
+        setAiConfig,
+        exportBackupJson,
+        importBackupJson,
         resetDemoData,
       }}
     >

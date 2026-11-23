@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Calendar, FileDown, Globe2, RefreshCw, Tv2 } from 'lucide-react';
+import { Calendar, FileDown, Globe2, RefreshCw, Sparkles, Tv2 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { UI_LANGUAGE_OPTIONS, UiLanguage } from '../i18n/translations';
 import { NavTab, PeriodOption } from '../types/youtube';
+import { AiInsightsModal } from './AiInsightsModal';
 import { ExportReportModal } from './ExportReportModal';
 import { formatRelativeTime } from '../utils/formatters';
 
 export function TopBar() {
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
   const {
     activeTab,
     channels,
@@ -193,6 +195,15 @@ export function TopBar() {
           </button>
 
           <button
+            onClick={() => setShowAiModal(true)}
+            title="Analyze current filtered data with AI Insights"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-lg shadow-purple-500/20 transition cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            AI Insights
+          </button>
+
+          <button
             onClick={() => setShowExportModal(true)}
             title="Personalizar e exportar relatório em PDF para análise com IA"
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold shadow-lg shadow-orange-500/20 transition cursor-pointer"
@@ -321,6 +332,9 @@ export function TopBar() {
       )}
       {showExportModal && (
         <ExportReportModal onClose={() => setShowExportModal(false)} />
+      )}
+      {showAiModal && (
+        <AiInsightsModal onClose={() => setShowAiModal(false)} />
       )}
     </header>
   );

@@ -9,14 +9,69 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { BarChart3, Globe2 } from 'lucide-react';
+import { BarChart3, Globe2, Languages } from 'lucide-react';
 import { PERIOD_DAYS, useStore } from '../context/StoreContext';
-import { formatCompact, formatCurrency, formatHours } from '../utils/formatters';
+import { formatCompact, formatCurrency, formatHours, formatNumber } from '../utils/formatters';
 import { VideoPerformanceScatter } from './VideoPerformanceScatter';
 
 export function AnalyticsView() {
-  const { channels, languages, metrics, period } = useStore();
+  const { channels, filteredChannels, languages, metrics, videos, period } = useStore();
   const days = PERIOD_DAYS[period];
+
+  const crossLanguageTopics = useMemo(() => {
+    const chMap = new Map(filteredChannels.map((c) => [c.id, c]));
+    const langMap = new Map(languages.map((l) => [l.id, l]));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - (days - 1));
+    const startStr = startDate.toISOString().slice(0, 10);
+
+    // Group videos published on the same date (or within same group) across different languages
+    const buckets = new Map<
+      string,
+      Array<{
+        video: (typeof videos)[number];
+        channelName: string;
+        langFlag: string;
+        langCode: string;
+        langName: string;
+      }>
+    >();
+
+    for (const v of videos) {
+      if (v.publishedAt < startStr) continue;
+      const ch = chMap.get(v.channelId);
+      if (!ch) continue;
+      const lang = langMap.get(ch.languageId);
+      const bucketKey = `${ch.groupId || 'all'}__${v.publishedAt}`;
+      const list = buckets.get(bucketKey) || [];
+      list.push({
+        video: v,
+        channelName: ch.name,
+        langFlag: lang?.flag || '',
+        langCode: lang?.code || ch.languageId,
+        langName: lang?.name || ch.languageId,
+      });
+      buckets.set(bucketKey, list);
+    }
+
+    return Array.from(buckets.entries())
+      .map(([key, items]) => {
+        const distinctLangs = new Set(items.map((i) => i.langCode));
+        const sorted = [...items].sort((a, b) => b.video.views - a.video.views);
+        return {
+          key,
+          date: key.split('__')[1],
+          distinctLangCount: distinctLangs.size,
+          items: sorted,
+        };
+      })
+      .filter((g) => g.distinctLangCount >= 2)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 8);
+  }, [filteredChannels, languages, videos, days]);
 
   const languageStats = useMemo(() => {
     const today = new Date();
@@ -66,6 +121,67 @@ export function AnalyticsView() {
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       <VideoPerformanceScatter />
+
+      {/* Cross-Language Topic Comparison */}
+      {crossLanguageTopics.length > 0 && (
+        <div className="rounded-2xl bg-[#121720] border border-slate-800/90 p-5 space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Languages className="w-5 h-5 text-sky-400" />
+              Cross-Language Performance (Same Publish Date)
+            </h2>
+            <p className="text-xs text-slate-400">
+              Compare how videos published on the same day performed across different languages.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {crossLanguageTopics.map((bundle) => (
+              <div
+                key={bundle.key}
+                className="rounded-xl bg-[#0b0f14] border border-slate-800 p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-mono-num font-semibold text-slate-200">
+                    📅 {bundle.date}
+                  </span>
+                  <span>{bundle.distinctLangCount} languages</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                  {bundle.items.map((entry, idx) => (
+                    <div
+                      key={entry.video.id}
+                      className={`rounded-xl p-3 border ${
+                        idx === 0
+                          ? 'bg-emerald-500/10 border-emerald-500/40'
+                          : 'bg-[#121720] border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-semibold text-slate-200">
+                          {entry.langFlag} {entry.langCode}
+                        </span>
+                        {idx === 0 && (
+                          <span className="text-[10px] font-bold uppercase text-emerald-400">
+                            #1 Best
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-white font-medium line-clamp-1 mb-1">
+                        {entry.video.title}
+                      </div>
+                      <div className="text-[11px] text-slate-400 flex items-center justify-between font-mono-num">
+                        <span>{formatNumber(entry.video.views)} views</span>
+                        <span>{formatNumber(entry.video.likes)} likes</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
