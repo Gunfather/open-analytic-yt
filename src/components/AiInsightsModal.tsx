@@ -25,7 +25,7 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
   const [loading, setLoading] = useState(false);
   const [analysisText, setAnalysisText] = useState('');
   const [usedMode, setUsedMode] = useState<
-    'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter' | 'local'
+    'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter' | 'nvidia' | 'local'
   >('local');
   const [customQuestion, setCustomQuestion] = useState(
     uiLanguage === 'pt-BR'
@@ -259,6 +259,8 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
                 ? 'Groq'
                 : usedMode === 'openrouter'
                 ? 'OpenRouter'
+                : usedMode === 'nvidia'
+                ? 'NVIDIA NIM'
                 : 'Local Analyzer'}
             </span>
           </div>

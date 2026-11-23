@@ -226,7 +226,7 @@ function youtubePublicProxyPlugin(): Plugin {
             chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
           }
           const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
-            provider: 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter';
+            provider: 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter' | 'nvidia';
             apiKey: string;
             model?: string;
             prompt: string;
@@ -275,9 +275,9 @@ function youtubePublicProxyPlugin(): Plugin {
             return;
           }
 
-          // OpenAI-compatible providers: OpenAI, DeepSeek, Groq, OpenRouter
+          // OpenAI-compatible providers: OpenAI, DeepSeek, Groq, OpenRouter, NVIDIA NIM
           const providerEndpoints: Record<
-            'openai' | 'deepseek' | 'groq' | 'openrouter',
+            'openai' | 'deepseek' | 'groq' | 'openrouter' | 'nvidia',
             { url: string; defaultModel: string }
           > = {
             openai: {
@@ -295,6 +295,10 @@ function youtubePublicProxyPlugin(): Plugin {
             openrouter: {
               url: 'https://openrouter.ai/api/v1/chat/completions',
               defaultModel: 'meta-llama/llama-3.3-70b-instruct:free',
+            },
+            nvidia: {
+              url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+              defaultModel: 'meta/llama-3.3-70b-instruct',
             },
           };
 

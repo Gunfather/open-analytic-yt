@@ -29,7 +29,7 @@ export function SettingsView() {
   const [draftKey, setDraftKey] = useState(apiKey);
   const [savedMsg, setSavedMsg] = useState('');
   const [aiProvider, setAiProvider] = useState<
-    'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter'
+    'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter' | 'nvidia'
   >(aiConfig.provider);
   const [aiKey, setAiKey] = useState(aiConfig.apiKey);
   const [aiModel, setAiModel] = useState(aiConfig.model || '');
@@ -208,7 +208,13 @@ export function SettingsView() {
             value={aiProvider}
             onChange={(e) =>
               setAiProvider(
-                e.target.value as 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter'
+                e.target.value as
+                  | 'gemini'
+                  | 'openai'
+                  | 'deepseek'
+                  | 'groq'
+                  | 'openrouter'
+                  | 'nvidia'
               )
             }
             className="px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white focus:outline-none focus:border-purple-500"
@@ -218,11 +224,18 @@ export function SettingsView() {
             <option value="deepseek">DeepSeek</option>
             <option value="groq">Groq</option>
             <option value="openrouter">OpenRouter</option>
+            <option value="nvidia">NVIDIA NIM</option>
           </select>
 
           <input
             type="password"
-            placeholder={aiProvider === 'gemini' ? 'AIza... (optional)' : 'sk-... (optional)'}
+            placeholder={
+              aiProvider === 'gemini'
+                ? 'AIza... (optional)'
+                : aiProvider === 'nvidia'
+                ? 'nvapi-... (optional)'
+                : 'sk-... (optional)'
+            }
             value={aiKey}
             onChange={(e) => setAiKey(e.target.value)}
             className="sm:col-span-2 px-3.5 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white font-mono-num focus:outline-none focus:border-purple-500"
@@ -238,6 +251,8 @@ export function SettingsView() {
               ? 'Model (default: llama-3.3-70b-versatile)'
               : aiProvider === 'openrouter'
               ? 'Model (default: meta-llama/llama-3.3-70b-instruct:free)'
+              : aiProvider === 'nvidia'
+              ? 'Model (default: meta/llama-3.3-70b-instruct)'
               : aiProvider === 'openai'
               ? 'Model (default: gpt-4o-mini)'
               : 'Model (auto: gemini-2.5-flash)'
