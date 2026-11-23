@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" fill="none">
+  <rect width="1200" height="680" rx="18" fill="#0b0f14"/>
+  <!-- Sidebar -->
+  <rect x="0" y="0" width="220" height="680" rx="18" fill="#0e131a"/>
+  <rect x="200" y="0" width="20" height="680" fill="#0e131a"/>
+  <line x1="220" y1="0" x2="220" y2="680" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- Brand -->
+  <rect x="20" y="18" width="34" height="34" rx="10" fill="#f97316"/>
+  <path d="M26 36h5l3-8 4 14 3-9 2 3h4" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="64" y="33" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">Open Analytic YT</text>
+  <text x="64" y="48" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Multi-Channel Monitor</text>
+
+  <!-- Nav items -->
+  <rect x="14" y="76" width="192" height="36" rx="10" fill="#f97316"/>
+  <text x="44" y="99" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="600">Dashboard</text>
+  <text x="44" y="138" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Channel Management</text>
+  <text x="44" y="174" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Videos</text>
+  <text x="44" y="210" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Video Analytics</text>
+  <text x="44" y="246" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Scheduled Tasks</text>
+  <text x="44" y="282" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Settings &amp; API</text>
+
+  <!-- TopBar -->
+  <rect x="221" y="0" width="979" height="86" fill="#0e131a"/>
+  <line x1="221" y1="86" x2="1200" y2="86" stroke="#1e293b" stroke-width="1"/>
+  <text x="246" y="32" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="700">Dashboard</text>
+  <text x="246" y="48" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">Last synced: just now · Auto 2m</text>
+
+  <!-- TopBar pills -->
+  <rect x="750" y="18" width="120" height="30" rx="8" fill="#131a24" stroke="#1e293b"/>
+  <text x="768" y="37" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">All Channels</text>
+  <rect x="880" y="18" width="110" height="30" rx="8" fill="#131a24" stroke="#1e293b"/>
+  <text x="896" y="37" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">Last 30 days</text>
+  <rect x="1000" y="18" width="115" height="30" rx="8" fill="#f97316"/>
+  <text x="1014" y="37" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">Export PDF (AI)</text>
+  <rect x="1125" y="18" width="54" height="30" rx="8" fill="#131a24" stroke="#1e293b"/>
+  <text x="1141" y="37" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">EN</text>
+
+  <!-- Language & Group filter bar -->
+  <text x="246" y="72" fill="#64748b" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700">LANGUAGES:</text>
+  <rect x="318" y="57" width="46" height="22" rx="6" fill="#f97316" fill-opacity="0.2" stroke="#f97316"/>
+  <text x="331" y="72" fill="#fdba74" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="600">All</text>
+  <rect x="372" y="57" width="70" height="22" rx="6" fill="#131a24" stroke="#1e293b"/>
+  <text x="383" y="72" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">English</text>
+  <rect x="450" y="57" width="76" height="22" rx="6" fill="#131a24" stroke="#1e293b"/>
+  <text x="461" y="72" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Portuguese</text>
+  <rect x="534" y="57" width="66" height="22" rx="6" fill="#131a24" stroke="#1e293b"/>
+  <text x="546" y="72" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">French</text>
+  <rect x="608" y="57" width="70" height="22" rx="6" fill="#131a24" stroke="#1e293b"/>
+  <text x="619" y="72" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Spanish</text>
+
+  <!-- Hero Number -->
+  <text x="246" y="122" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">VIEWS OVERVIEW · MULTI-CHANNEL</text>
+  <text x="246" y="160" fill="#ffffff" font-family="JetBrains Mono,monospace" font-size="36" font-weight="800">128,450</text>
+  <rect x="420" y="138" width="58" height="22" rx="11" fill="#10b981" fill-opacity="0.18" stroke="#10b981"/>
+  <text x="431" y="153" fill="#34d399" font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">+18.4%</text>
+
+  <!-- 5 KPI Cards -->
+  <rect x="246" y="182" width="176" height="92" rx="14" fill="#171d26" stroke="#f97316" stroke-width="1.5"/>
+  <text x="262" y="206" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">Total Views</text>
+  <text x="262" y="236" fill="#ffffff" font-family="JetBrains Mono,monospace" font-size="20" font-weight="700">128,450</text>
+  <text x="262" y="256" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">62.4% Hook Rate</text>
+
+  <rect x="434" y="182" width="176" height="92" rx="14" fill="#121720" stroke="#1e293b"/>
+  <text x="450" y="206" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">Watch Time (hrs)</text>
+  <text x="450" y="236" fill="#ffffff" font-family="JetBrains Mono,monospace" font-size="20" font-weight="700">4.2K</text>
+  <text x="450" y="256" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Total watch time</text>
+
+  <rect x="622" y="182" width="176" height="92" rx="14" fill="#121720" stroke="#1e293b"/>
+  <text x="638" y="206" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">Subscribers</text>
+  <text x="638" y="236" fill="#ffffff" font-family="JetBrains Mono,monospace" font-size="20" font-weight="700">+1,420</text>
+  <text x="638" y="256" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">New in period</text>
+
+  <rect x="810" y="182" width="176" height="92" rx="14" fill="#121720" stroke="#1e293b"/>
+  <text x="826" y="206" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">Engagement</text>
+  <text x="826" y="236" fill="#ffffff" font-family="JetBrains Mono,monospace" font-size="20" font-weight="700">8,912</text>
+  <text x="826" y="256" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Likes · Comments · Shares</text>
+
+  <rect x="998" y="182" width="176" height="92" rx="14" fill="#121720" stroke="#1e293b"/>
+  <text x="1014" y="206" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">Estimated Revenue</text>
+  <text x="1014" y="236" fill="#34d399" font-family="JetBrains Mono,monospace" font-size="20" font-weight="700">$384.20</text>
+  <text x="1014" y="256" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">$2.99 Avg RPM</text>
+
+  <!-- Main Chart Card -->
+  <rect x="246" y="292" width="928" height="240" rx="16" fill="#121720" stroke="#1e293b"/>
+  <text x="268" y="322" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">Views Overview</text>
+  <rect x="890" y="304" width="264" height="28" rx="8" fill="#0b0f14" stroke="#1e293b"/>
+  <rect x="894" y="307" width="66" height="22" rx="6" fill="#f97316"/>
+  <text x="903" y="322" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="600">Combined</text>
+  <text x="968" y="322" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Language</text>
+  <text x="1028" y="322" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Group</text>
+  <text x="1084" y="322" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Channel</text>
+
+  <!-- Grid lines & Orange Area Curve -->
+  <line x1="270" y1="365" x2="1150" y2="365" stroke="#1e293b" stroke-dasharray="4 4"/>
+  <line x1="270" y1="415" x2="1150" y2="415" stroke="#1e293b" stroke-dasharray="4 4"/>
+  <line x1="270" y1="465" x2="1150" y2="465" stroke="#1e293b" stroke-dasharray="4 4"/>
+  <path d="M270 485 C330 470, 380 410, 440 430 C500 450, 560 365, 620 385 C680 405, 740 440, 800 390 C860 340, 920 395, 980 355 C1040 315, 1100 360, 1150 340 L1150 500 L270 500 Z" fill="#f97316" fill-opacity="0.18"/>
+  <path d="M270 485 C330 470, 380 410, 440 430 C500 450, 560 365, 620 385 C680 405, 740 440, 800 390 C860 340, 920 395, 980 355 C1040 315, 1100 360, 1150 340" stroke="#f97316" stroke-width="3" fill="none"/>
+
+  <!-- Bottom Cards Row -->
+  <rect x="246" y="548" width="454" height="112" rx="16" fill="#121720" stroke="#1e293b"/>
+  <text x="268" y="576" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700">How viewers find your content</text>
+  <text x="268" y="602" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">YouTube search</text>
+  <text x="652" y="602" fill="#ffffff" font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">57%</text>
+  <rect x="268" y="610" width="410" height="6" rx="3" fill="#1e293b"/>
+  <rect x="268" y="610" width="234" height="6" rx="3" fill="#4f46e5"/>
+  <text x="268" y="636" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">Suggested videos</text>
+  <text x="652" y="636" fill="#ffffff" font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">26%</text>
+  <rect x="268" y="644" width="410" height="6" rx="3" fill="#1e293b"/>
+  <rect x="268" y="644" width="106" height="6" rx="3" fill="#4f46e5"/>
+
+  <rect x="720" y="548" width="454" height="112" rx="16" fill="#121720" stroke="#1e293b"/>
+  <text x="742" y="576" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700">Device type &amp; Viewing behavior</text>
+  <rect x="742" y="594" width="410" height="10" rx="5" fill="#1e293b"/>
+  <rect x="742" y="594" width="288" height="10" rx="5" fill="#f1f5f9"/>
+  <rect x="1032" y="594" width="54" height="10" fill="#6366f1"/>
+  <rect x="1088" y="594" width="48" height="10" fill="#c084fc"/>
+  <rect x="1138" y="594" width="14" height="10" rx="4" fill="#f43f5e"/>
+  <text x="742" y="630" fill="#cbd5e1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">Mobile 70.4% · Computer 13.2% · TV 12.2% · Tablet 4.2%</text>
+  <text x="742" y="648" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">100% Local-First · Open Source (CC0 1.0 Universal)</text>
+</svg>
