@@ -65,6 +65,8 @@ export function SettingsView() {
     return !PROVIDER_MODELS[aiConfig.provider].includes(aiConfig.model);
   });
   const [aiSavedMsg, setAiSavedMsg] = useState('');
+  const [aiTestMsg, setAiTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [aiTesting, setAiTesting] = useState(false);
   const [selectedCsvChannelId, setSelectedCsvChannelId] = useState(
     channels[0]?.id || ''
   );
@@ -83,6 +85,49 @@ export function SettingsView() {
     setAiConfig({ provider: aiProvider, apiKey: aiKey, model: aiModel });
     setAiSavedMsg('AI configuration saved locally!');
     setTimeout(() => setAiSavedMsg(''), 3000);
+  };
+
+  const handleTestAi = async () => {
+    if (!aiKey.trim()) {
+      setAiTestMsg({ ok: false, text: 'Enter an API key first.' });
+      return;
+    }
+    setAiConfig({ provider: aiProvider, apiKey: aiKey, model: aiModel });
+    setAiTesting(true);
+    setAiTestMsg(null);
+    try {
+      const res = await fetch('/api/ai-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: aiProvider,
+          apiKey: aiKey.trim(),
+          model: aiModel.trim() || undefined,
+          prompt: 'Reply with: OK',
+        }),
+      });
+      const raw = await res.text();
+      if (raw.trimStart().startsWith('<')) {
+        setAiTestMsg({
+          ok: false,
+          text: 'Restart start_open-analytic-yt.bat to activate /api/ai-analyze.',
+        });
+        return;
+      }
+      const data = JSON.parse(raw) as { ok?: boolean; model?: string; error?: string };
+      if (!res.ok || !data.ok) {
+        setAiTestMsg({ ok: false, text: data.error || `HTTP ${res.status}` });
+      } else {
+        setAiTestMsg({ ok: true, text: `Connected! Model: ${data.model || aiModel}` });
+      }
+    } catch (err) {
+      setAiTestMsg({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Connection failed',
+      });
+    } finally {
+      setAiTesting(false);
+    }
   };
 
   const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -301,15 +346,33 @@ export function SettingsView() {
           )}
         </div>
 
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-emerald-400">{aiSavedMsg}</span>
-          <button
-            type="submit"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-xs font-semibold text-white transition cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {t('saveAiBtn')}
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs">
+            {aiSavedMsg && <span className="text-emerald-400 mr-3">{aiSavedMsg}</span>}
+            {aiTestMsg && (
+              <span className={aiTestMsg.ok ? 'text-emerald-400' : 'text-rose-400'}>
+                {aiTestMsg.ok ? '✅ ' : '❌ '}
+                {aiTestMsg.text}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleTestAi()}
+              disabled={aiTesting}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition cursor-pointer disabled:opacity-50"
+            >
+              {aiTesting ? 'Testing...' : 'Test AI'}
+            </button>
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-xs font-semibold text-white transition cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {t('saveAiBtn')}
+            </button>
+          </div>
         </div>
       </form>
 

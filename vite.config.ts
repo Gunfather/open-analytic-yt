@@ -317,6 +317,12 @@ function youtubePublicProxyPlugin(): Plugin {
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${body.apiKey}`,
+              ...(body.provider === 'openrouter'
+                ? {
+                    'HTTP-Referer': 'http://localhost:5173',
+                    'X-Title': 'Open Analytic YT',
+                  }
+                : {}),
             },
             body: JSON.stringify({
               model: chosenModel,

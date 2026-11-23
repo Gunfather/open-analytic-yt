@@ -24,6 +24,8 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
 
   const [loading, setLoading] = useState(false);
   const [analysisText, setAnalysisText] = useState('');
+  const [activeModelName, setActiveModelName] = useState<string>('');
+  const [apiError, setApiError] = useState<string | null>(null);
   const [usedMode, setUsedMode] = useState<
     'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter' | 'nvidia' | 'local'
   >('local');
@@ -184,9 +186,11 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
 
   const runAnalysis = async () => {
     setLoading(true);
+    setApiError(null);
     try {
       if (!aiConfig.apiKey) {
         setUsedMode('local');
+        setActiveModelName('');
         setAnalysisText(buildLocalDiagnostics(customQuestion));
         return;
       }
@@ -225,20 +229,24 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
             : 'Please restart the local server (close and reopen start_open-analytic-yt.bat) to activate the AI endpoint.'
         );
       }
-      const data = JSON.parse(rawText) as { ok?: boolean; text?: string; error?: string };
+      const data = JSON.parse(rawText) as {
+        ok?: boolean;
+        text?: string;
+        model?: string;
+        error?: string;
+      };
       if (!res.ok || !data.ok || !data.text) {
         throw new Error(data.error || `HTTP ${res.status}`);
       }
 
       setUsedMode(aiConfig.provider);
+      setActiveModelName(data.model || aiConfig.model || '');
       setAnalysisText(data.text);
     } catch (err) {
       setUsedMode('local');
-      setAnalysisText(
-        `⚠️ ${
-          err instanceof Error ? err.message : 'AI request error'
-        }\n\n${buildLocalDiagnostics(customQuestion)}`
-      );
+      setActiveModelName('');
+      setApiError(err instanceof Error ? err.message : 'AI request error');
+      setAnalysisText(buildLocalDiagnostics(customQuestion));
     } finally {
       setLoading(false);
     }
@@ -270,6 +278,7 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
                 : usedMode === 'nvidia'
                 ? 'NVIDIA NIM'
                 : 'Local Analyzer'}
+              {activeModelName ? ` · ${activeModelName}` : ''}
             </span>
           </div>
           <button
@@ -281,6 +290,12 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
         </div>
 
         <div className="p-5 space-y-4 flex-1 overflow-y-auto">
+          {apiError && (
+            <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 px-3.5 py-2.5 text-xs text-rose-300">
+              ❌ <strong>AI API Error:</strong> {apiError}
+            </div>
+          )}
+
           {!aiConfig.apiKey && (
             <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-3.5 py-2.5 flex items-center justify-between gap-3 text-xs text-amber-200">
               <span>
