@@ -217,7 +217,15 @@ export function AiInsightsModal({ onClose }: AiInsightsModalProps) {
         }),
       });
 
-      const data = (await res.json()) as { ok?: boolean; text?: string; error?: string };
+      const rawText = await res.text();
+      if (rawText.trimStart().startsWith('<')) {
+        throw new Error(
+          uiLanguage === 'pt-BR'
+            ? 'Reinicie o servidor (feche e abra novamente o start_open-analytic-yt.bat) para ativar a rota da IA.'
+            : 'Please restart the local server (close and reopen start_open-analytic-yt.bat) to activate the AI endpoint.'
+        );
+      }
+      const data = JSON.parse(rawText) as { ok?: boolean; text?: string; error?: string };
       if (!res.ok || !data.ok || !data.text) {
         throw new Error(data.error || `HTTP ${res.status}`);
       }

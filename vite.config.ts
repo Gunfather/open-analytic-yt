@@ -316,17 +316,37 @@ function youtubePublicProxyPlugin(): Plugin {
               messages: [{ role: 'user', content: body.prompt }],
             }),
           });
-          const oaData = (await oaRes.json()) as {
+          const oaRaw = await oaRes.text();
+          let oaData: {
             choices?: Array<{ message?: { content?: string } }>;
             error?: { message?: string };
-          };
+            detail?: string;
+          } = {};
+          try {
+            oaData = JSON.parse(oaRaw);
+          } catch {
+            res.statusCode = 502;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(
+              JSON.stringify({
+                error: `${body.provider} retornou resposta inválida (${oaRes.status}): ${oaRaw.slice(
+                  0,
+                  140
+                )}`,
+              })
+            );
+            return;
+          }
           const oaText = oaData.choices?.[0]?.message?.content;
           if (!oaRes.ok || !oaText) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
             res.end(
               JSON.stringify({
-                error: oaData.error?.message || `${body.provider} HTTP ${oaRes.status}`,
+                error:
+                  oaData.error?.message ||
+                  oaData.detail ||
+                  `${body.provider} HTTP ${oaRes.status}`,
               })
             );
             return;
