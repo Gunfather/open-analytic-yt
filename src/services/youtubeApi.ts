@@ -1,4 +1,5 @@
 import {
+  AutoNicheTrend,
   Channel,
   CompetitorChannel,
   CompetitorVideo,
@@ -692,4 +693,179 @@ export async function fetchCompetitorChannelSnapshot(params: {
     videos,
     lastSyncedAt: nowIso,
   };
+}
+
+const AUTO_RADAR_STORAGE_KEY = 'open_analytic_auto_radar_v2';
+
+export async function fetchAutonomousNicheRadar(
+  market: 'BR' | 'US' | 'FR' | 'ES',
+  forceRefresh = false,
+  apiKey?: string
+): Promise<{ trends: AutoNicheTrend[]; scannedAt: string }> {
+  if (!forceRefresh) {
+    try {
+      const raw = localStorage.getItem(AUTO_RADAR_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<
+          string,
+          { savedAt: number; scannedAt: string; trends: AutoNicheTrend[] }
+        >;
+        const cached = parsed[market];
+        if (cached && Date.now() - cached.savedAt < 20 * 60 * 1000 && cached.trends.length > 0) {
+          return { trends: cached.trends, scannedAt: cached.scannedAt };
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    const res = await fetch(
+      `/api/niche-radar?gl=${encodeURIComponent(market)}${forceRefresh ? '&force=1' : ''}`
+    );
+    const rawText = await res.text();
+    if (!rawText.trimStart().startsWith('<')) {
+      const data = JSON.parse(rawText) as {
+        ok?: boolean;
+        scannedAt?: string;
+        trends?: AutoNicheTrend[];
+        error?: string;
+      };
+      if (res.ok && data.trends && data.trends.length > 0) {
+        const scannedAt = data.scannedAt || new Date().toISOString();
+        try {
+          const prevRaw = localStorage.getItem(AUTO_RADAR_STORAGE_KEY);
+          const map = prevRaw ? JSON.parse(prevRaw) : {};
+          map[market] = { savedAt: Date.now(), scannedAt, trends: data.trends };
+          localStorage.setItem(AUTO_RADAR_STORAGE_KEY, JSON.stringify(map));
+        } catch {
+          // ignore
+        }
+        return { trends: data.trends, scannedAt };
+      }
+    }
+  } catch {
+    // Fallback below if dev server hasn't reloaded vite.config.ts yet
+  }
+
+  // Direct 1-quota-unit fallback via YouTube Data API v3 mostPopular chart if apiKey is available
+  if (apiKey) {
+    const popUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&maxResults=40&regionCode=${encodeURIComponent(
+      market
+    )}&key=${encodeURIComponent(apiKey)}`;
+    const popRes = await fetch(popUrl);
+    if (popRes.ok) {
+      const popData = (await popRes.json()) as {
+        items?: Array<{
+          id: string;
+          snippet: {
+            title: string;
+            channelTitle: string;
+            categoryId?: string;
+            publishedAt: string;
+            thumbnails?: { medium?: { url: string }; high?: { url: string } };
+          };
+          statistics: { viewCount?: string };
+          contentDetails: { duration: string };
+        }>;
+      };
+
+      const catDefs: Record<string, { name: string; icon: string; query: string }> = {
+        '27': { name: 'Educação, História & Curiosidades', icon: '🏛️', query: 'historia curiosidades misterios' },
+        '28': { name: 'Ciência, IA & Tecnologia', icon: '🤖', query: 'ciencia inteligencia artificial futuro' },
+        '24': { name: 'Entretenimento & Storytelling', icon: '🎬', query: 'documentario historias reais' },
+        '22': { name: 'Comportamento, Pessoas & Blogs', icon: '🧠', query: 'psicologia comportamento humano' },
+        '25': { name: 'Geopolítica, Notícias & Atualidades', icon: '🌍', query: 'geopolitica economia mundo' },
+        '26': { name: 'Estilo, Hábitos & Produtividade', icon: '⚡', query: 'habitos mente produtividade' },
+        '1': { name: 'Cinema, Animação & Mistérios', icon: '🕵️', query: 'misterios inexplicaveis documentario' },
+        '20': { name: 'Gaming & Cultura Pop', icon: '🎮', query: 'curiosidades games historia' },
+      };
+
+      const grouped = new Map<string, typeof popData.items>();
+      for (const item of popData.items || []) {
+        const cid = item.snippet.categoryId || '24';
+        const bucket = grouped.get(cid) || [];
+        bucket.push(item);
+        grouped.set(cid, bucket);
+      }
+
+      const nowMs = Date.now();
+      const trends: AutoNicheTrend[] = [];
+      for (const [cid, list] of grouped.entries()) {
+        if (!list || list.length === 0) continue;
+        const meta = catDefs[cid] || {
+          name: `Tendências Categoria #${cid}`,
+          icon: '🔥',
+          query: list[0].snippet.title.split(' ').slice(0, 3).join(' '),
+        };
+        const enriched = list.map((v) => {
+          const views = Number(v.statistics.viewCount || 0);
+          const daysAgo = Math.max(
+            1,
+            Math.round((nowMs - new Date(v.snippet.publishedAt).getTime()) / 86400000)
+          );
+          const durationSec = parseIsoDuration(v.contentDetails.duration);
+          return {
+            id: v.id,
+            title: v.snippet.title,
+            channelTitle: v.snippet.channelTitle,
+            thumbnailUrl:
+              v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url || '',
+            views,
+            viewsPerDay: Math.round(views / daysAgo),
+            daysAgo,
+            isShort: durationSec <= 65,
+          };
+        });
+        const sortedV = [...enriched.map((e) => e.views)].sort((a, b) => a - b);
+        const med = Math.max(sortedV[Math.floor(sortedV.length / 2)] || 5000, 1000);
+        const withOut = enriched
+          .map((e) => ({ ...e, outlierScore: Number((e.views / med).toFixed(1)) }))
+          .sort((a, b) => b.viewsPerDay - a.viewsPerDay);
+        const avgVpd = Math.round(
+          withOut.reduce((s, e) => s + e.viewsPerDay, 0) / withOut.length
+        );
+        const maxOut = Number(Math.max(...withOut.map((e) => e.outlierScore), 1.2).toFixed(1));
+        const heatScore = Math.min(
+          98,
+          Math.max(45, Math.round(Math.log10(Math.max(avgVpd, 100)) * 14 + maxOut * 3))
+        );
+        trends.push({
+          id: `cat-${cid}`,
+          name: meta.name,
+          icon: meta.icon,
+          query: meta.query,
+          market,
+          heatScore,
+          statusLabel: heatScore >= 80 ? 'Explodindo Agora' : 'Em Forte Alta',
+          avgViewsPerDay: avgVpd,
+          maxOutlier: maxOut,
+          recentCount: withOut.length,
+          shortsPct: Math.round(
+            (withOut.filter((e) => e.isShort).length / withOut.length) * 100
+          ),
+          topVideo: withOut[0] || null,
+        });
+      }
+
+      const ranked = trends
+        .sort((a, b) => b.heatScore - a.heatScore || b.avgViewsPerDay - a.avgViewsPerDay)
+        .slice(0, 8);
+      const scannedAt = new Date().toISOString();
+      try {
+        const prevRaw = localStorage.getItem(AUTO_RADAR_STORAGE_KEY);
+        const map = prevRaw ? JSON.parse(prevRaw) : {};
+        map[market] = { savedAt: Date.now(), scannedAt, trends: ranked };
+        localStorage.setItem(AUTO_RADAR_STORAGE_KEY, JSON.stringify(map));
+      } catch {
+        // ignore
+      }
+      return { trends: ranked, scannedAt };
+    }
+  }
+
+  throw new Error(
+    'Reinicie o servidor local (start_open-analytic-yt.bat / npm run dev) para ativar o Radar Autônomo.'
+  );
 }

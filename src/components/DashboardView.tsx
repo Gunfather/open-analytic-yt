@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -23,21 +23,21 @@ import {
   EyeOff,
   Flame,
   Heart,
-  Plus,
   Radar,
   RefreshCw,
-  Search,
   TrendingUp,
   Users,
   Video,
 } from 'lucide-react';
 import { PERIOD_DAYS, useStore } from '../context/StoreContext';
-import { ChartViewMode, KpiMetricKey, VideoItem } from '../types/youtube';
+import { fetchAutonomousNicheRadar } from '../services/youtubeApi';
+import { AutoNicheTrend, ChartViewMode, KpiMetricKey, VideoItem } from '../types/youtube';
 import {
   formatCompact,
   formatCurrency,
   formatHours,
   formatNumber,
+  formatRelativeTime,
 } from '../utils/formatters';
 
 function DeltaBadge({ pct }: { pct: number }) {
@@ -72,6 +72,7 @@ type SortField =
 
 export function DashboardView() {
   const {
+    apiKey,
     channels,
     filteredChannels,
     languages,
@@ -81,6 +82,7 @@ export function DashboardView() {
     isSyncingCompetitors,
     syncCompetitors,
     openNicheExplorerWithQuery,
+    selectedLanguageId,
     selectedNicheId,
     setSelectedNicheId,
     metrics,
@@ -98,7 +100,12 @@ export function DashboardView() {
 
   const [sortField, setSortField] = useState<SortField>('views');
   const [sortDesc, setSortDesc] = useState(true);
-  const [quickNicheInput, setQuickNicheInput] = useState('');
+  const [radarMarket, setRadarMarket] = useState<'BR' | 'US' | 'FR' | 'ES'>('BR');
+  const [autoTrends, setAutoTrends] = useState<AutoNicheTrend[]>([]);
+  const [radarScanning, setRadarScanning] = useState(false);
+  const [radarScannedAt, setRadarScannedAt] = useState<string | null>(null);
+  const [radarError, setRadarError] = useState<string | null>(null);
+  const [showAllRadarNiches, setShowAllRadarNiches] = useState(false);
   const [showNicheRadar, setShowNicheRadar] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('pulseyt_show_niche_radar');
@@ -879,6 +886,43 @@ export function DashboardView() {
     }
   };
 
+  // Sync autonomous radar market automatically when user filters language in TopBar
+  useEffect(() => {
+    if (selectedLanguageId === 'pt-BR') setRadarMarket('BR');
+    else if (selectedLanguageId === 'en') setRadarMarket('US');
+    else if (selectedLanguageId === 'fr') setRadarMarket('FR');
+    else if (selectedLanguageId === 'es') setRadarMarket('ES');
+  }, [selectedLanguageId]);
+
+  const runAutonomousScan = async (
+    targetMarket: 'BR' | 'US' | 'FR' | 'ES',
+    forceRefresh = false
+  ) => {
+    setRadarScanning(true);
+    setRadarError(null);
+    try {
+      const res = await fetchAutonomousNicheRadar(targetMarket, forceRefresh, apiKey);
+      setAutoTrends(res.trends);
+      setRadarScannedAt(res.scannedAt);
+    } catch (err) {
+      setRadarError(
+        err instanceof Error ? err.message : 'Erro ao escanear nichos em alta.'
+      );
+    } finally {
+      setRadarScanning(false);
+    }
+  };
+
+  // Autonomous background scan on mount, market switch, and every 20 minutes without human intervention
+  useEffect(() => {
+    if (!showNicheRadar) return;
+    void runAutonomousScan(radarMarket, false);
+    const intervalId = window.setInterval(() => {
+      void runAutonomousScan(radarMarket, true);
+    }, 20 * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [radarMarket, showNicheRadar]);
+
   const topCompetitorOutliers = useMemo(() => {
     const items: Array<{
       channelName: string;
@@ -989,71 +1033,89 @@ export function DashboardView() {
         </div>
       )}
 
-      {/* Front-Page Niche Radar */}
+      {/* Autonomous Front-Page Niche Radar */}
       {showNicheRadar ? (
-        <div className="rounded-2xl bg-gradient-to-r from-emerald-500/10 via-[#121720] to-purple-500/10 border border-emerald-500/30 p-5 space-y-4">
+        <div className="rounded-2xl bg-gradient-to-r from-emerald-500/10 via-[#121720] to-orange-500/10 border border-emerald-500/30 p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                <Radar className="w-4 h-4 text-emerald-400" />
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                <Radar
+                  className={`w-5 h-5 text-emerald-400 ${
+                    radarScanning ? 'animate-spin' : ''
+                  }`}
+                />
               </div>
               <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
-                  Nicho Radar
-                  <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-mono-num normal-case">
-                    {niches.length} nicho(s) · {competitors.length} concorrente(s)
+                <div className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2 flex-wrap">
+                  Nicho Radar Autônomo
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-semibold normal-case">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {radarScanning ? 'Escaneando YouTube...' : 'Auto-Scan Ativo'}
                   </span>
+                  {radarScannedAt && !radarScanning && (
+                    <span className="text-[10px] text-slate-400 font-normal normal-case">
+                      · atualizado {formatRelativeTime(radarScannedAt)}
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Monitore seus nichos ativos, pesquise subnichos e acompanhe vídeos outliers dos concorrentes.
+                  Descobre automaticamente os nichos Dark/Faceless com maior velocidade de views e outliers no momento, sem intervenção manual.
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!quickNicheInput.trim()) return;
-                  openNicheExplorerWithQuery(quickNicheInput);
-                  setQuickNicheInput('');
-                }}
-                className="flex items-center gap-1.5"
-              >
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={quickNicheInput}
-                    onChange={(e) => setQuickNicheInput(e.target.value)}
-                    placeholder="Explorar nicho ou tema..."
-                    className="pl-8 pr-3 py-1.5 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 w-44 sm:w-56"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={!quickNicheInput.trim()}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold transition cursor-pointer disabled:opacity-50"
-                >
-                  Explorar
-                </button>
-              </form>
+              {/* Market Switcher */}
+              <div className="inline-flex rounded-xl bg-[#0b0f14] p-1 border border-slate-800">
+                {(
+                  [
+                    { id: 'BR', label: '🇧🇷 BR' },
+                    { id: 'US', label: '🇺🇸 US' },
+                    { id: 'FR', label: '🇫🇷 FR' },
+                    { id: 'ES', label: '🇪🇸 ES' },
+                  ] as const
+                ).map((mkt) => (
+                  <button
+                    key={mkt.id}
+                    type="button"
+                    onClick={() => setRadarMarket(mkt.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                      radarMarket === mkt.id
+                        ? 'bg-emerald-500 text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {mkt.label}
+                  </button>
+                ))}
+              </div>
 
-              {competitors.length > 0 && (
+              {autoTrends.length > 4 && (
                 <button
                   type="button"
-                  onClick={() => void syncCompetitors()}
-                  disabled={isSyncingCompetitors}
-                  title="Atualizar vídeos dos concorrentes no Radar"
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition cursor-pointer disabled:opacity-50"
+                  onClick={() => setShowAllRadarNiches((v) => !v)}
+                  className="px-3 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 font-medium cursor-pointer"
                 >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 ${
-                      isSyncingCompetitors ? 'animate-spin text-emerald-400' : ''
-                    }`}
-                  />
+                  {showAllRadarNiches ? 'Top 4' : `Ver Todos (${autoTrends.length})`}
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  void runAutonomousScan(radarMarket, true);
+                  if (competitors.length > 0) void syncCompetitors();
+                }}
+                disabled={radarScanning || isSyncingCompetitors}
+                title="Forçar nova varredura agora"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${
+                    radarScanning ? 'animate-spin text-emerald-400' : ''
+                  }`}
+                />
+              </button>
 
               <button
                 type="button"
@@ -1061,7 +1123,7 @@ export function DashboardView() {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-200 text-xs font-semibold transition cursor-pointer"
               >
                 <Compass className="w-3.5 h-3.5 text-purple-300" />
-                Abrir Análise de Nicho
+                Suite de Nicho
               </button>
 
               <button
@@ -1075,72 +1137,176 @@ export function DashboardView() {
             </div>
           </div>
 
-          {/* Registered Niches Cards */}
+          {radarError && (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-xs text-amber-300">
+              ⚠️ {radarError}
+            </div>
+          )}
+
+          {/* Skeleton while first autonomous scan runs */}
+          {radarScanning && autoTrends.length === 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              {[0, 1, 2, 3].map((idx) => (
+                <div
+                  key={idx}
+                  className="rounded-xl bg-[#0b0f14]/80 border border-slate-800 p-4 h-40 animate-pulse flex flex-col justify-between"
+                >
+                  <div className="h-4 w-2/3 bg-slate-800 rounded" />
+                  <div className="h-10 w-full bg-slate-800/70 rounded" />
+                  <div className="h-3 w-1/2 bg-slate-800 rounded" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Autonomous Trending Niches Grid (4 per row) */}
+          {autoTrends.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              {(showAllRadarNiches ? autoTrends : autoTrends.slice(0, 4)).map(
+                (trend, idx) => {
+                  const isHot = trend.heatScore >= 75;
+                  const topVidUrl = trend.topVideo
+                    ? trend.topVideo.isShort
+                      ? `https://www.youtube.com/shorts/${trend.topVideo.id}`
+                      : `https://www.youtube.com/watch?v=${trend.topVideo.id}`
+                    : null;
+
+                  return (
+                    <div
+                      key={trend.id}
+                      className={`rounded-xl bg-[#0b0f14]/95 border p-3.5 flex flex-col justify-between gap-3 transition ${
+                        idx === 0
+                          ? 'border-orange-500/50 shadow-lg shadow-orange-500/5'
+                          : isHot
+                          ? 'border-emerald-500/35 hover:border-emerald-400/60'
+                          : 'border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-[10px] font-mono-num font-extrabold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">
+                              #{idx + 1}
+                            </span>
+                            <span className="text-sm shrink-0">{trend.icon}</span>
+                            <span className="text-xs font-bold text-white truncate">
+                              {trend.name}
+                            </span>
+                          </div>
+                          <span
+                            className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-extrabold font-mono-num border ${
+                              idx === 0 || isHot
+                                ? 'bg-orange-500/15 text-orange-300 border-orange-500/35'
+                                : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            }`}
+                          >
+                            🔥 {trend.heatScore}°
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1.5 text-center py-1.5 rounded-lg bg-[#121720] border border-slate-800/80">
+                          <div>
+                            <div className="text-[11px] font-bold font-mono-num text-white">
+                              {formatCompact(trend.avgViewsPerDay)}
+                            </div>
+                            <div className="text-[9px] text-slate-500">Views/Dia</div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-bold font-mono-num text-emerald-400">
+                              {trend.maxOutlier}x
+                            </div>
+                            <div className="text-[9px] text-slate-500">Pico Outlier</div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-bold font-mono-num text-sky-400">
+                              {100 - trend.shortsPct}%
+                            </div>
+                            <div className="text-[9px] text-slate-500">Longos</div>
+                          </div>
+                        </div>
+
+                        {trend.topVideo && topVidUrl && (
+                          <a
+                            href={topVidUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2.5 p-1.5 rounded-lg bg-[#121720]/70 hover:bg-slate-800/80 border border-slate-800/60 transition group"
+                          >
+                            <img
+                              src={trend.topVideo.thumbnailUrl}
+                              alt={trend.topVideo.title}
+                              className="w-16 h-10 rounded object-cover shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[11px] font-medium text-slate-200 group-hover:text-orange-300 truncate">
+                                {trend.topVideo.title}
+                              </div>
+                              <div className="text-[10px] text-slate-400 truncate">
+                                {trend.topVideo.channelTitle} ·{' '}
+                                <span className="text-emerald-400 font-mono-num">
+                                  {formatCompact(trend.topVideo.viewsPerDay)}/dia
+                                </span>
+                              </div>
+                            </div>
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800/70">
+                        <span className="text-[10px] font-semibold text-emerald-400">
+                          {trend.statusLabel}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openNicheExplorerWithQuery(trend.query)}
+                          className="text-[11px] font-bold text-orange-400 hover:text-orange-300 transition cursor-pointer"
+                        >
+                          Explorar &amp; Pautas →
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          )}
+
+          {/* Optional Registered Niches Strip (only shown when user created custom niches) */}
           {nicheSummaries.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {nicheSummaries.map(({ niche, channelsCount, views, revenue }) => {
+            <div className="pt-2 border-t border-slate-800/70 flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Meus Nichos:
+              </span>
+              {nicheSummaries.map(({ niche, channelsCount, views }) => {
                 const isSelected = selectedNicheId === niche.id;
                 return (
-                  <div
+                  <button
                     key={niche.id}
-                    className={`rounded-xl p-3.5 border transition flex flex-col justify-between gap-2.5 ${
+                    type="button"
+                    onClick={() => setSelectedNicheId(isSelected ? 'all' : niche.id)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border transition cursor-pointer ${
                       isSelected
-                        ? 'bg-emerald-500/10 border-emerald-500/50'
-                        : 'bg-[#0b0f14]/90 border-slate-800 hover:border-slate-700'
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'
+                        : 'bg-[#0b0f14] border-slate-800 text-slate-300 hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedNicheId(isSelected ? 'all' : niche.id)
-                        }
-                        className="flex items-center gap-2 min-w-0 text-left cursor-pointer"
-                      >
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: niche.color }}
-                        />
-                        <span className="text-sm">{niche.icon}</span>
-                        <span className="text-xs font-bold text-white truncate">
-                          {niche.name}
-                        </span>
-                      </button>
-                      <span className="text-[10px] text-slate-400 font-mono-num shrink-0">
-                        {channelsCount} can.
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
-                      <div className="font-mono-num">
-                        <span className="font-bold text-white">{formatCompact(views)}</span>{' '}
-                        <span className="text-[10px] text-slate-400">views</span> ·{' '}
-                        <span className="font-bold text-emerald-400">
-                          {formatCurrency(revenue)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openNicheExplorerWithQuery(niche.keywords || niche.name)
-                        }
-                        className="text-[10px] font-bold text-emerald-300 hover:text-emerald-200 cursor-pointer"
-                      >
-                        Outliers →
-                      </button>
-                    </div>
-                  </div>
+                    <span>{niche.icon}</span>
+                    <span className="font-semibold">{niche.name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono-num">
+                      ({channelsCount} · {formatCompact(views)} views)
+                    </span>
+                  </button>
                 );
               })}
             </div>
           )}
 
-          {/* Top 4 Competitor Outliers on Front Page */}
+          {/* Optional Monitored Competitor Outliers (only shown when competitors exist) */}
           {topCompetitorOutliers.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2 border-t border-slate-800/70">
               <div className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-orange-400" />
-                Top Vídeos Outliers dos Concorrentes Monitorados
+                Top Vídeos Outliers dos Seus Concorrentes
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {topCompetitorOutliers.map(({ channelName, languageId, video }) => {
@@ -1178,33 +1344,6 @@ export function DashboardView() {
               </div>
             </div>
           )}
-
-          {/* Empty Quick-Actions if user hasn't added Niches or Competitors yet */}
-          {nicheSummaries.length === 0 && topCompetitorOutliers.length === 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-800/70 text-xs text-slate-400">
-              <span>
-                Cadastre seus nichos em <strong>Gerenciar Canais (+ Novo Nicho)</strong> ou adicione canais rivais no <strong>Radar de Concorrentes</strong> para ver os outliers aqui na página inicial.
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('channels')}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-emerald-500/30 text-emerald-300 text-xs font-semibold cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Novo Nicho
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('niche')}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-orange-500/30 text-orange-300 text-xs font-semibold cursor-pointer"
-                >
-                  <Radar className="w-3.5 h-3.5" />
-                  Adicionar Concorrente
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div className="flex justify-end">
@@ -1214,7 +1353,7 @@ export function DashboardView() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121720] hover:bg-slate-800 border border-slate-800 text-xs text-emerald-300 transition cursor-pointer"
           >
             <Radar className="w-3.5 h-3.5 text-emerald-400" />
-            Mostrar Nicho Radar
+            Mostrar Nicho Radar Autônomo
           </button>
         </div>
       )}

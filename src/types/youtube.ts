@@ -256,3 +256,28 @@ export interface CompetitorChannel {
   videos: CompetitorVideo[];
   lastSyncedAt: string;
 }
+
+export interface AutoNicheTrend {
+  id: string;
+  name: string;
+  icon: string;
+  query: string;
+  market: 'BR' | 'US' | 'FR' | 'ES';
+  heatScore: number;
+  statusLabel: string;
+  avgViewsPerDay: number;
+  maxOutlier: number;
+  recentCount: number;
+  shortsPct: number;
+  topVideo: {
+    id: string;
+    title: string;
+    channelTitle: string;
+    thumbnailUrl: string;
+    views: number;
+    viewsPerDay: number;
+    daysAgo: number;
+    outlierScore: number;
+    isShort: boolean;
+  } | null;
+}
