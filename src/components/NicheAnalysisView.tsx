@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Check,
   Compass,
@@ -151,12 +151,15 @@ export function NicheAnalysisView() {
     aiConfig,
     languages,
     groups,
+    niches,
     channels,
     competitors,
     isSyncingCompetitors,
     addCompetitor,
     removeCompetitor,
     syncCompetitors,
+    pendingNicheQuery,
+    clearPendingNicheQuery,
     setActiveTab,
     uiLanguage,
   } = useStore();
@@ -211,6 +214,17 @@ export function NicheAnalysisView() {
   const [copied, setCopied] = useState(false);
 
   const langMap = useMemo(() => new Map(languages.map((l) => [l.id, l])), [languages]);
+
+  useEffect(() => {
+    if (pendingNicheQuery) {
+      const q = pendingNicheQuery;
+      clearPendingNicheQuery();
+      setSubTab('explorer');
+      setQuery(q);
+      void executeSearch(q, marketId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingNicheQuery]);
 
   const executeSearch = async (
     overrideQuery?: string,
@@ -749,7 +763,29 @@ Estruture a resposta de forma clara e prática com:
               </div>
             </form>
 
-            {/* Preset Chips */}
+            {/* Saved Niches + Preset Chips */}
+            {niches.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap pt-1">
+                <span className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">
+                  Meus Nichos:
+                </span>
+                {niches.map((nc) => (
+                  <button
+                    key={nc.id}
+                    type="button"
+                    onClick={() => {
+                      const q = nc.keywords || nc.name;
+                      setQuery(q);
+                      void executeSearch(q, marketId);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold transition cursor-pointer"
+                  >
+                    {nc.icon} {nc.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center gap-2 flex-wrap pt-1">
               <span className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">
                 Sugestões rápidas:

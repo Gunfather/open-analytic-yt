@@ -3,6 +3,7 @@ import {
   AggregatedKpis,
   Channel,
   ChannelGroup,
+  ChannelNiche,
   ChartViewMode,
   CompetitorChannel,
   DailyMetric,
@@ -35,6 +36,7 @@ const STORAGE_KEY = 'pulseyt_store_v1';
 interface PersistedState {
   languages: Language[];
   groups?: ChannelGroup[];
+  niches?: ChannelNiche[];
   channels: Channel[];
   metrics: DailyMetric[];
   videos: VideoItem[];
@@ -52,6 +54,7 @@ interface PersistedState {
 interface StoreContextValue {
   languages: Language[];
   groups: ChannelGroup[];
+  niches: ChannelNiche[];
   channels: Channel[];
   filteredChannels: Channel[];
   metrics: DailyMetric[];
@@ -64,6 +67,8 @@ interface StoreContextValue {
   setSelectedLanguageId: (id: string) => void;
   selectedGroupId: string; // 'all' | groupId
   setSelectedGroupId: (id: string) => void;
+  selectedNicheId: string; // 'all' | nicheId
+  setSelectedNicheId: (id: string) => void;
   selectedChannelId: string; // 'all' | channelId
   setSelectedChannelId: (id: string) => void;
   chartViewMode: ChartViewMode;
@@ -81,6 +86,7 @@ interface StoreContextValue {
     youtubeChannelId?: string;
     languageId: string;
     groupId?: string;
+    nicheId?: string;
     color: string;
     rpm?: number;
     ctr?: number;
@@ -96,6 +102,17 @@ interface StoreContextValue {
     channelIds?: string[];
   }) => ChannelGroup;
   deleteGroup: (id: string) => void;
+  addNiche: (input: {
+    name: string;
+    keywords?: string;
+    icon: string;
+    color: string;
+    channelIds?: string[];
+  }) => ChannelNiche;
+  deleteNiche: (id: string) => void;
+  pendingNicheQuery: string | null;
+  openNicheExplorerWithQuery: (query: string) => void;
+  clearPendingNicheQuery: () => void;
   syncAllChannels: () => Promise<void>;
   autoSyncMinutes: 0 | 2 | 10 | 20;
   setAutoSyncMinutes: (minutes: 0 | 2 | 10 | 20) => void;
@@ -235,7 +252,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [period, setPeriod] = useState<PeriodOption>('30d');
   const [selectedLanguageId, setSelectedLanguageId] = useState<string>('all');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
+  const [selectedNicheId, setSelectedNicheId] = useState<string>('all');
   const [selectedChannelId, setSelectedChannelId] = useState<string>('all');
+  const [pendingNicheQuery, setPendingNicheQuery] = useState<string | null>(null);
   const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('combined');
   const [selectedKpi, setSelectedKpi] = useState<KpiMetricKey>('views');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -320,10 +339,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!ch.isActive) return false;
       if (selectedLanguageId !== 'all' && ch.languageId !== selectedLanguageId) return false;
       if (selectedGroupId !== 'all' && ch.groupId !== selectedGroupId) return false;
+      if (selectedNicheId !== 'all' && ch.nicheId !== selectedNicheId) return false;
       if (selectedChannelId !== 'all' && ch.id !== selectedChannelId) return false;
       return true;
     });
-  }, [state.channels, selectedLanguageId, selectedGroupId, selectedChannelId]);
+  }, [state.channels, selectedLanguageId, selectedGroupId, selectedNicheId, selectedChannelId]);
 
   const aggregatedKpis = useMemo<AggregatedKpis>(() => {
     const days = PERIOD_DAYS[period];
@@ -473,6 +493,53 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const addNiche: StoreContextValue['addNiche'] = ({
+    name,
+    keywords,
+    icon,
+    color,
+    channelIds = [],
+  }) => {
+    const newNiche: ChannelNiche = {
+      id: `niche-${Date.now()}`,
+      name: name.trim(),
+      keywords: keywords?.trim() || undefined,
+      icon: icon.trim() || '🎯',
+      color,
+    };
+    const idSet = new Set(channelIds);
+    setState((prev) => ({
+      ...prev,
+      niches: [...(prev.niches || []), newNiche],
+      channels: prev.channels.map((ch) =>
+        idSet.has(ch.id) ? { ...ch, nicheId: newNiche.id } : ch
+      ),
+    }));
+    return newNiche;
+  };
+
+  const deleteNiche = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      niches: (prev.niches || []).filter((n) => n.id !== id),
+      channels: prev.channels.map((ch) =>
+        ch.nicheId === id ? { ...ch, nicheId: undefined } : ch
+      ),
+    }));
+    if (selectedNicheId === id) {
+      setSelectedNicheId('all');
+    }
+  };
+
+  const openNicheExplorerWithQuery = (query: string) => {
+    setPendingNicheQuery(query.trim());
+    setActiveTab('niche');
+  };
+
+  const clearPendingNicheQuery = () => {
+    setPendingNicheQuery(null);
+  };
+
   const addChannel: StoreContextValue['addChannel'] = async (input) => {
     const cleanHandle = input.handle.startsWith('@') ? input.handle.trim() : `@${input.handle.trim()}`;
     const normHandle = cleanHandle.toLowerCase().replace(/^@/, '');
@@ -501,6 +568,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         name: input.name.trim() || existing.name,
         languageId: input.languageId || existing.languageId,
         groupId: input.groupId || existing.groupId,
+        nicheId: input.nicheId || existing.nicheId,
         color: input.color || existing.color,
         rpm: input.rpm ?? existing.rpm,
         ctr: input.ctr ?? existing.ctr,
@@ -517,6 +585,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       name: input.name.trim(),
       languageId: input.languageId,
       groupId: input.groupId || undefined,
+      nicheId: input.nicheId || undefined,
       avatarUrl: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(
         input.name.trim().slice(0, 2).toUpperCase()
       )}`,
@@ -1127,6 +1196,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         exportedAt: new Date().toISOString(),
         languages: state.languages,
         groups: state.groups || [],
+        niches: state.niches || [],
         channels: state.channels,
         metrics: state.metrics,
         videos: state.videos,
@@ -1148,6 +1218,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         languages: parsed.languages!,
         groups: Array.isArray(parsed.groups) ? parsed.groups : [],
+        niches: Array.isArray(parsed.niches) ? parsed.niches : prev.niches || [],
         channels: parsed.channels!,
         metrics: Array.isArray(parsed.metrics) ? parsed.metrics : [],
         videos: Array.isArray(parsed.videos) ? parsed.videos : [],
@@ -1191,6 +1262,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       value={{
         languages: state.languages,
         groups: state.groups || [],
+        niches: state.niches || [],
         channels: state.channels,
         filteredChannels,
         metrics: state.metrics,
@@ -1203,6 +1275,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setSelectedLanguageId,
         selectedGroupId,
         setSelectedGroupId,
+        selectedNicheId,
+        setSelectedNicheId,
         selectedChannelId,
         setSelectedChannelId,
         chartViewMode,
@@ -1221,6 +1295,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         addLanguage,
         addGroup,
         deleteGroup,
+        addNiche,
+        deleteNiche,
+        pendingNicheQuery,
+        openNicheExplorerWithQuery,
+        clearPendingNicheQuery,
         syncAllChannels,
         autoSyncMinutes,
         setAutoSyncMinutes,

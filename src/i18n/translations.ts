@@ -50,6 +50,8 @@ export const TRANSLATIONS = {
     allLabel: 'All',
     groupsLabel: 'Groups',
     allGroups: 'All Groups',
+    nichesLabel: 'Niches',
+    allNiches: 'All Niches',
 
     // Dashboard
     activeChannelsSuffix: 'active channel(s)',
@@ -116,6 +118,7 @@ export const TRANSLATIONS = {
 
     // Channels / Videos / Analytics / Scheduled / Settings
     connectedChannels: 'Connected Channels',
+    newNiche: '+ New Niche',
     newGroup: '+ New Group',
     newLanguage: '+ New Language',
     addChannel: 'Add Channel',
@@ -215,6 +218,8 @@ export const TRANSLATIONS = {
     allLabel: 'Todos',
     groupsLabel: 'Grupos',
     allGroups: 'Todos os Grupos',
+    nichesLabel: 'Nichos',
+    allNiches: 'Todos os Nichos',
 
     activeChannelsSuffix: 'canal(is) ativo(s)',
     viewsDeltaSubtitle: 'Variação de views vs. período anterior',
@@ -279,6 +284,7 @@ export const TRANSLATIONS = {
     externalOther: 'Externo / Outros',
 
     connectedChannels: 'Canais Conectados',
+    newNiche: '+ Novo Nicho',
     newGroup: '+ Novo Grupo',
     newLanguage: '+ Novo Idioma',
     addChannel: 'Adicionar Canal',
@@ -378,6 +384,8 @@ export const TRANSLATIONS = {
     allLabel: 'Toutes',
     groupsLabel: 'Groupes',
     allGroups: 'Tous les groupes',
+    nichesLabel: 'Niches',
+    allNiches: 'Toutes les niches',
 
     activeChannelsSuffix: 'chaîne(s) active(s)',
     viewsDeltaSubtitle: 'Évolution des vues vs période précédente',
@@ -442,6 +450,7 @@ export const TRANSLATIONS = {
     externalOther: 'Externe / Autres',
 
     connectedChannels: 'Chaînes connectées',
+    newNiche: '+ Nouvelle niche',
     newGroup: '+ Nouveau groupe',
     newLanguage: '+ Nouvelle langue',
     addChannel: 'Ajouter une chaîne',
@@ -541,6 +550,8 @@ export const TRANSLATIONS = {
     allLabel: 'Todos',
     groupsLabel: 'Grupos',
     allGroups: 'Todos los Grupos',
+    nichesLabel: 'Nichos',
+    allNiches: 'Todos los Nichos',
 
     activeChannelsSuffix: 'canal(es) activo(s)',
     viewsDeltaSubtitle: 'Cambio de vistas vs. período anterior',
@@ -605,6 +616,7 @@ export const TRANSLATIONS = {
     externalOther: 'Externo / Otros',
 
     connectedChannels: 'Canales Conectados',
+    newNiche: '+ Nuevo Nicho',
     newGroup: '+ Nuevo Grupo',
     newLanguage: '+ Nuevo Idioma',
     addChannel: 'Añadir Canal',

@@ -16,11 +16,17 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Clock,
+  Compass,
   DollarSign,
   ExternalLink,
   Eye,
   EyeOff,
+  Flame,
   Heart,
+  Plus,
+  Radar,
+  RefreshCw,
+  Search,
   TrendingUp,
   Users,
   Video,
@@ -70,6 +76,13 @@ export function DashboardView() {
     filteredChannels,
     languages,
     groups,
+    niches,
+    competitors,
+    isSyncingCompetitors,
+    syncCompetitors,
+    openNicheExplorerWithQuery,
+    selectedNicheId,
+    setSelectedNicheId,
     metrics,
     videos,
     period,
@@ -85,6 +98,26 @@ export function DashboardView() {
 
   const [sortField, setSortField] = useState<SortField>('views');
   const [sortDesc, setSortDesc] = useState(true);
+  const [quickNicheInput, setQuickNicheInput] = useState('');
+  const [showNicheRadar, setShowNicheRadar] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('pulseyt_show_niche_radar');
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const toggleNicheRadar = () => {
+    setShowNicheRadar((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('pulseyt_show_niche_radar', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
   const [showTrafficSources, setShowTrafficSources] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('pulseyt_show_traffic_sources');
@@ -846,6 +879,56 @@ export function DashboardView() {
     }
   };
 
+  const topCompetitorOutliers = useMemo(() => {
+    const items: Array<{
+      channelName: string;
+      channelHandle: string;
+      languageId: string;
+      nicheTag: string;
+      video: (typeof competitors)[number]['videos'][number];
+    }> = [];
+    for (const comp of competitors) {
+      for (const v of comp.videos) {
+        items.push({
+          channelName: comp.name,
+          channelHandle: comp.handle,
+          languageId: comp.languageId,
+          nicheTag: comp.nicheTag,
+          video: v,
+        });
+      }
+    }
+    return items.sort((a, b) => b.video.outlierScore - a.video.outlierScore).slice(0, 4);
+  }, [competitors]);
+
+  const nicheSummaries = useMemo(() => {
+    if (niches.length === 0) return [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(today.getDate() - (PERIOD_DAYS[period] - 1));
+    const startStr = start.toISOString().slice(0, 10);
+
+    return niches.map((nc) => {
+      const ncChannels = channels.filter((c) => c.isActive && c.nicheId === nc.id);
+      const idSet = new Set(ncChannels.map((c) => c.id));
+      let views = 0;
+      let revenue = 0;
+      for (const m of metrics) {
+        if (idSet.has(m.channelId) && m.date >= startStr) {
+          views += m.views;
+          revenue += m.revenue;
+        }
+      }
+      return {
+        niche: nc,
+        channelsCount: ncChannels.length,
+        views,
+        revenue,
+      };
+    });
+  }, [niches, channels, metrics, period]);
+
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       {channels.length === 0 && (
@@ -903,6 +986,236 @@ export function DashboardView() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Front-Page Niche Radar */}
+      {showNicheRadar ? (
+        <div className="rounded-2xl bg-gradient-to-r from-emerald-500/10 via-[#121720] to-purple-500/10 border border-emerald-500/30 p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                <Radar className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                  Nicho Radar
+                  <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-mono-num normal-case">
+                    {niches.length} nicho(s) · {competitors.length} concorrente(s)
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Monitore seus nichos ativos, pesquise subnichos e acompanhe vídeos outliers dos concorrentes.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!quickNicheInput.trim()) return;
+                  openNicheExplorerWithQuery(quickNicheInput);
+                  setQuickNicheInput('');
+                }}
+                className="flex items-center gap-1.5"
+              >
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={quickNicheInput}
+                    onChange={(e) => setQuickNicheInput(e.target.value)}
+                    placeholder="Explorar nicho ou tema..."
+                    className="pl-8 pr-3 py-1.5 rounded-xl bg-[#0b0f14] border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!quickNicheInput.trim()}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                >
+                  Explorar
+                </button>
+              </form>
+
+              {competitors.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void syncCompetitors()}
+                  disabled={isSyncingCompetitors}
+                  title="Atualizar vídeos dos concorrentes no Radar"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${
+                      isSyncingCompetitors ? 'animate-spin text-emerald-400' : ''
+                    }`}
+                  />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('niche')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-200 text-xs font-semibold transition cursor-pointer"
+              >
+                <Compass className="w-3.5 h-3.5 text-purple-300" />
+                Abrir Análise de Nicho
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleNicheRadar}
+                title="Ocultar Nicho Radar"
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <EyeOff className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Registered Niches Cards */}
+          {nicheSummaries.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {nicheSummaries.map(({ niche, channelsCount, views, revenue }) => {
+                const isSelected = selectedNicheId === niche.id;
+                return (
+                  <div
+                    key={niche.id}
+                    className={`rounded-xl p-3.5 border transition flex flex-col justify-between gap-2.5 ${
+                      isSelected
+                        ? 'bg-emerald-500/10 border-emerald-500/50'
+                        : 'bg-[#0b0f14]/90 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedNicheId(isSelected ? 'all' : niche.id)
+                        }
+                        className="flex items-center gap-2 min-w-0 text-left cursor-pointer"
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: niche.color }}
+                        />
+                        <span className="text-sm">{niche.icon}</span>
+                        <span className="text-xs font-bold text-white truncate">
+                          {niche.name}
+                        </span>
+                      </button>
+                      <span className="text-[10px] text-slate-400 font-mono-num shrink-0">
+                        {channelsCount} can.
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
+                      <div className="font-mono-num">
+                        <span className="font-bold text-white">{formatCompact(views)}</span>{' '}
+                        <span className="text-[10px] text-slate-400">views</span> ·{' '}
+                        <span className="font-bold text-emerald-400">
+                          {formatCurrency(revenue)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openNicheExplorerWithQuery(niche.keywords || niche.name)
+                        }
+                        className="text-[10px] font-bold text-emerald-300 hover:text-emerald-200 cursor-pointer"
+                      >
+                        Outliers →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Top 4 Competitor Outliers on Front Page */}
+          {topCompetitorOutliers.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-orange-400" />
+                Top Vídeos Outliers dos Concorrentes Monitorados
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {topCompetitorOutliers.map(({ channelName, languageId, video }) => {
+                  const lang = languages.find((l) => l.id === languageId);
+                  const ytUrl = video.isShort
+                    ? `https://www.youtube.com/shorts/${video.id}`
+                    : `https://www.youtube.com/watch?v=${video.id}`;
+                  return (
+                    <a
+                      key={`${channelName}-${video.id}`}
+                      href={ytUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-xl bg-[#0b0f14]/90 border border-slate-800 hover:border-orange-500/40 p-2.5 flex items-center gap-3 transition group"
+                    >
+                      <img
+                        src={video.thumbnailUrl}
+                        alt={video.title}
+                        className="w-20 h-12 rounded-lg object-cover shrink-0 border border-slate-800"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-white group-hover:text-orange-400 truncate">
+                          {video.title}
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {lang?.flag} {channelName} · {formatCompact(video.views)} views
+                        </div>
+                        <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 text-[10px] font-bold font-mono-num">
+                          🔥 {video.outlierScore}x média
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Empty Quick-Actions if user hasn't added Niches or Competitors yet */}
+          {nicheSummaries.length === 0 && topCompetitorOutliers.length === 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-800/70 text-xs text-slate-400">
+              <span>
+                Cadastre seus nichos em <strong>Gerenciar Canais (+ Novo Nicho)</strong> ou adicione canais rivais no <strong>Radar de Concorrentes</strong> para ver os outliers aqui na página inicial.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('channels')}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-emerald-500/30 text-emerald-300 text-xs font-semibold cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Novo Nicho
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('niche')}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-orange-500/30 text-orange-300 text-xs font-semibold cursor-pointer"
+                >
+                  <Radar className="w-3.5 h-3.5" />
+                  Adicionar Concorrente
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={toggleNicheRadar}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121720] hover:bg-slate-800 border border-slate-800 text-xs text-emerald-300 transition cursor-pointer"
+          >
+            <Radar className="w-3.5 h-3.5 text-emerald-400" />
+            Mostrar Nicho Radar
+          </button>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, FolderPlus, Globe2, Pencil, Plus, Power, RefreshCw, Trash2, Tv2 } from 'lucide-react';
+import { Compass, ExternalLink, FolderPlus, Globe2, Pencil, Plus, Power, RefreshCw, Trash2, Tv2 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { Channel } from '../types/youtube';
 import { formatCompact, formatCurrency } from '../utils/formatters';
@@ -20,6 +20,7 @@ export function ChannelsView() {
     channels,
     languages,
     groups,
+    niches,
     addChannel,
     updateChannel,
     deleteChannel,
@@ -28,8 +29,12 @@ export function ChannelsView() {
     addLanguage,
     addGroup,
     deleteGroup,
+    addNiche,
+    deleteNiche,
+    openNicheExplorerWithQuery,
     selectedLanguageId,
     selectedGroupId,
+    selectedNicheId,
     selectedChannelId,
     t,
   } = useStore();
@@ -39,6 +44,7 @@ export function ChannelsView() {
   const [syncingChannelId, setSyncingChannelId] = useState<string | null>(null);
   const [showAddLanguage, setShowAddLanguage] = useState(false);
   const [showAddGroup, setShowAddGroup] = useState(false);
+  const [showAddNiche, setShowAddNiche] = useState(false);
 
   // Add Channel form
   const [name, setName] = useState('');
@@ -46,6 +52,7 @@ export function ChannelsView() {
   const [ytId, setYtId] = useState('');
   const [languageId, setLanguageId] = useState(languages[0]?.id || 'pt-BR');
   const [groupId, setGroupId] = useState('');
+  const [nicheId, setNicheId] = useState('');
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const [rpm, setRpm] = useState('2.50');
   const [ctr, setCtr] = useState('6.2');
@@ -90,12 +97,21 @@ export function ChannelsView() {
   const [groupColor, setGroupColor] = useState('#f97316');
   const [groupChannelIds, setGroupChannelIds] = useState<string[]>([]);
 
+  // Add Niche form
+  const [nicheName, setNicheName] = useState('');
+  const [nicheKeywords, setNicheKeywords] = useState('');
+  const [nicheIcon, setNicheIcon] = useState('🎯');
+  const [nicheColor, setNicheColor] = useState('#10b981');
+  const [nicheChannelIds, setNicheChannelIds] = useState<string[]>([]);
+
   const langMap = new Map(languages.map((l) => [l.id, l]));
   const groupMap = new Map(groups.map((g) => [g.id, g]));
+  const nicheMap = new Map(niches.map((n) => [n.id, n]));
 
   const visibleChannels = channels.filter((ch) => {
     if (selectedLanguageId !== 'all' && ch.languageId !== selectedLanguageId) return false;
     if (selectedGroupId !== 'all' && ch.groupId !== selectedGroupId) return false;
+    if (selectedNicheId !== 'all' && ch.nicheId !== selectedNicheId) return false;
     if (selectedChannelId !== 'all' && ch.id !== selectedChannelId) return false;
     return true;
   });
@@ -107,6 +123,7 @@ export function ChannelsView() {
     setYtId('');
     setLanguageId(languages[0]?.id || 'pt-BR');
     setGroupId('');
+    setNicheId('');
     setColor(PRESET_COLORS[0]);
     setRpm('2.50');
     setCtr('6.2');
@@ -152,6 +169,7 @@ export function ChannelsView() {
     setYtId(ch.youtubeChannelId || '');
     setLanguageId(ch.languageId);
     setGroupId(ch.groupId || '');
+    setNicheId(ch.nicheId || '');
     setColor(ch.color);
     setRpm(ch.rpm.toFixed(2));
     setCtr((ch.ctr ?? 6.2).toFixed(1));
@@ -253,6 +271,7 @@ export function ChannelsView() {
           youtubeChannelId: ytId.trim() || undefined,
           languageId,
           groupId: groupId || undefined,
+          nicheId: nicheId || undefined,
           color,
           rpm: parsedRpm,
           cpm: Number((parsedRpm * 1.75).toFixed(2)),
@@ -273,6 +292,7 @@ export function ChannelsView() {
           youtubeChannelId: ytId || undefined,
           languageId,
           groupId: groupId || undefined,
+          nicheId: nicheId || undefined,
           color,
           rpm: parsedRpm,
           ctr: parsedCtr,
@@ -322,6 +342,28 @@ export function ChannelsView() {
     );
   };
 
+  const handleCreateNiche = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nicheName.trim()) return;
+    addNiche({
+      name: nicheName,
+      keywords: nicheKeywords,
+      icon: nicheIcon,
+      color: nicheColor,
+      channelIds: nicheChannelIds,
+    });
+    setNicheName('');
+    setNicheKeywords('');
+    setNicheChannelIds([]);
+    setShowAddNiche(false);
+  };
+
+  const toggleNicheChannel = (id: string) => {
+    setNicheChannelIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       {/* Header Actions */}
@@ -338,6 +380,14 @@ export function ChannelsView() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => setShowAddNiche((v) => !v)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#131a24] hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-emerald-500/40 hover:border-emerald-400 transition cursor-pointer"
+          >
+            <Compass className="w-4 h-4 text-emerald-400" />
+            {t('newNiche')}
+          </button>
+
           <button
             onClick={() => setShowAddGroup((v) => !v)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#131a24] hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
@@ -363,6 +413,149 @@ export function ChannelsView() {
           </button>
         </div>
       </div>
+
+      {/* Existing Niches Strip */}
+      {niches.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {niches.map((nc) => {
+            const count = channels.filter((c) => c.nicheId === nc.id).length;
+            return (
+              <div
+                key={nc.id}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#121720] border border-emerald-500/30 text-xs text-slate-200"
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: nc.color }}
+                />
+                <span>{nc.icon}</span>
+                <span className="font-semibold">{nc.name}</span>
+                <span className="text-slate-400 font-mono-num">({count} canais)</span>
+                <button
+                  type="button"
+                  onClick={() => openNicheExplorerWithQuery(nc.keywords || nc.name)}
+                  title="Explorar este nicho e buscar vídeos outliers"
+                  className="px-2 py-0.5 rounded-md bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-[10px] font-bold transition cursor-pointer"
+                >
+                  Analisar
+                </button>
+                <button
+                  onClick={() => deleteNiche(nc.id)}
+                  title="Excluir nicho"
+                  className="text-slate-500 hover:text-rose-400 transition cursor-pointer ml-0.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add Niche Panel */}
+      {showAddNiche && (
+        <form
+          onSubmit={handleCreateNiche}
+          className="rounded-2xl bg-[#121720] border border-emerald-500/40 p-5 space-y-4"
+        >
+          <div className="text-sm font-bold text-white flex items-center gap-2">
+            <Compass className="w-4 h-4 text-emerald-400" />
+            Adicionar Novo Nicho (ex.: Arqueologia Bíblica, Psicologia &amp; Mistérios)
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Nome do Nicho *</label>
+              <input
+                type="text"
+                required
+                placeholder="Ex: Arqueologia Bíblica"
+                value={nicheName}
+                onChange={(e) => setNicheName(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">
+                Palavras-Chave p/ Pesquisa (opcional)
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: arqueologia biblica enigmas"
+                value={nicheKeywords}
+                onChange={(e) => setNicheKeywords(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Ícone (Emoji)</label>
+              <input
+                type="text"
+                value={nicheIcon}
+                onChange={(e) => setNicheIcon(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Cor do Nicho</label>
+              <input
+                type="color"
+                value={nicheColor}
+                onChange={(e) => setNicheColor(e.target.value)}
+                className="w-full h-9 rounded-xl bg-[#0b0f14] border border-slate-700 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {channels.length > 0 && (
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">
+                Vincular canais existentes a este nicho:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                {channels.map((ch) => {
+                  const checked = nicheChannelIds.includes(ch.id);
+                  const lang = langMap.get(ch.languageId);
+                  return (
+                    <label
+                      key={ch.id}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs cursor-pointer transition ${
+                        checked
+                          ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
+                          : 'bg-[#0b0f14] border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleNicheChannel(ch.id)}
+                        className="accent-emerald-500"
+                      />
+                      <span>{lang?.flag}</span>
+                      <span className="truncate font-medium">{ch.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAddNiche(false)}
+              className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold cursor-pointer"
+            >
+              Salvar Nicho
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Existing Groups Strip */}
       {groups.length > 0 && (
@@ -634,6 +827,21 @@ export function ChannelsView() {
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.icon} {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Nicho (opcional)</label>
+              <select
+                value={nicheId}
+                onChange={(e) => setNicheId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-sm text-white focus:outline-none focus:border-orange-500"
+              >
+                <option value="">Sem nicho</option>
+                {niches.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.icon} {n.name}
                   </option>
                 ))}
               </select>
@@ -1020,6 +1228,7 @@ export function ChannelsView() {
         {visibleChannels.map((ch) => {
           const lang = langMap.get(ch.languageId);
           const grp = ch.groupId ? groupMap.get(ch.groupId) : undefined;
+          const nc = ch.nicheId ? nicheMap.get(ch.nicheId) : undefined;
           return (
             <div
               key={ch.id}
@@ -1052,6 +1261,11 @@ export function ChannelsView() {
                   {grp && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium bg-violet-500/15 border border-violet-500/30 text-violet-300">
                       {grp.icon} {grp.name}
+                    </span>
+                  )}
+                  {nc && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                      {nc.icon} {nc.name}
                     </span>
                   )}
                 </div>

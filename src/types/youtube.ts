@@ -28,6 +28,14 @@ export interface ChannelGroup {
   color: string;
 }
 
+export interface ChannelNiche {
+  id: string;
+  name: string;
+  keywords?: string;
+  icon: string;
+  color: string;
+}
+
 export interface TrafficSources {
   search: number; // Pesquisa do YouTube (%)
   browse: number; // Funcionalidades de navegação (%)
@@ -82,6 +90,7 @@ export interface Channel {
   name: string;
   languageId: string;
   groupId?: string;
+  nicheId?: string;
   avatarUrl: string;
   color: string;
   isActive: boolean;

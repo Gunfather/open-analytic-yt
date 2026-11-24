@@ -15,12 +15,15 @@ export function TopBar() {
     channels,
     languages,
     groups,
+    niches,
     period,
     setPeriod,
     selectedLanguageId,
     setSelectedLanguageId,
     selectedGroupId,
     setSelectedGroupId,
+    selectedNicheId,
+    setSelectedNicheId,
     selectedChannelId,
     setSelectedChannelId,
     isSyncing,
@@ -64,7 +67,8 @@ export function TopBar() {
     (c) =>
       c.isActive &&
       (selectedLanguageId === 'all' || c.languageId === selectedLanguageId) &&
-      (selectedGroupId === 'all' || c.groupId === selectedGroupId)
+      (selectedGroupId === 'all' || c.groupId === selectedGroupId) &&
+      (selectedNicheId === 'all' || c.nicheId === selectedNicheId)
   );
 
   return (
@@ -285,7 +289,7 @@ export function TopBar() {
                 : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
               }`}
           >
-            {t('allLabel')} ({channels.filter((c) => c.isActive && (selectedGroupId === 'all' || c.groupId === selectedGroupId)).length})
+            {t('allLabel')} ({channels.filter((c) => c.isActive && (selectedGroupId === 'all' || c.groupId === selectedGroupId) && (selectedNicheId === 'all' || c.nicheId === selectedNicheId)).length})
           </button>
 
           {languages.map((lang) => {
@@ -293,7 +297,8 @@ export function TopBar() {
               (c) =>
                 c.isActive &&
                 c.languageId === lang.id &&
-                (selectedGroupId === 'all' || c.groupId === selectedGroupId)
+                (selectedGroupId === 'all' || c.groupId === selectedGroupId) &&
+                (selectedNicheId === 'all' || c.nicheId === selectedNicheId)
             ).length;
             const isSelected = selectedLanguageId === lang.id;
             return (
@@ -337,7 +342,7 @@ export function TopBar() {
                 : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
               }`}
           >
-            {t('allGroups')} ({channels.filter((c) => c.isActive && (selectedLanguageId === 'all' || c.languageId === selectedLanguageId)).length})
+            {t('allGroups')} ({channels.filter((c) => c.isActive && (selectedLanguageId === 'all' || c.languageId === selectedLanguageId) && (selectedNicheId === 'all' || c.nicheId === selectedNicheId)).length})
           </button>
 
           {groups.map((grp) => {
@@ -345,7 +350,8 @@ export function TopBar() {
               (c) =>
                 c.isActive &&
                 c.groupId === grp.id &&
-                (selectedLanguageId === 'all' || c.languageId === selectedLanguageId)
+                (selectedLanguageId === 'all' || c.languageId === selectedLanguageId) &&
+                (selectedNicheId === 'all' || c.nicheId === selectedNicheId)
             ).length;
             const isSelected = selectedGroupId === grp.id;
             return (
@@ -362,6 +368,66 @@ export function TopBar() {
               >
                 <span>{grp.icon}</span>
                 <span>{grp.name}</span>
+                <span className="font-mono-num text-[11px] opacity-75">({count})</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Niches Filter Bar */}
+      {niches.length > 0 && (
+        <div className="px-6 py-2 border-t border-slate-800/60 bg-[#0b0f14]/90 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mr-1">
+            {t('nichesLabel')}:
+          </span>
+          <button
+            onClick={() => {
+              setSelectedNicheId('all');
+              setSelectedChannelId('all');
+            }}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
+              selectedNicheId === 'all'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            {t('allNiches')} (
+            {
+              channels.filter(
+                (c) =>
+                  c.isActive &&
+                  (selectedLanguageId === 'all' || c.languageId === selectedLanguageId) &&
+                  (selectedGroupId === 'all' || c.groupId === selectedGroupId)
+              ).length
+            }
+            )
+          </button>
+
+          {niches.map((nc) => {
+            const count = channels.filter(
+              (c) =>
+                c.isActive &&
+                c.nicheId === nc.id &&
+                (selectedLanguageId === 'all' || c.languageId === selectedLanguageId) &&
+                (selectedGroupId === 'all' || c.groupId === selectedGroupId)
+            ).length;
+            const isSelected = selectedNicheId === nc.id;
+            return (
+              <button
+                key={nc.id}
+                onClick={() => {
+                  setSelectedNicheId(isSelected ? 'all' : nc.id);
+                  setSelectedChannelId('all');
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
+                  isSelected
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <span>{nc.icon}</span>
+                <span>{nc.name}</span>
                 <span className="font-mono-num text-[11px] opacity-75">({count})</span>
               </button>
             );
