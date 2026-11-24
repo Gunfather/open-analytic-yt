@@ -695,7 +695,7 @@ export async function fetchCompetitorChannelSnapshot(params: {
   };
 }
 
-const AUTO_RADAR_STORAGE_KEY = 'open_analytic_auto_radar_v2';
+const AUTO_RADAR_STORAGE_KEY = 'open_analytic_auto_radar_v3';
 
 export async function fetchAutonomousNicheRadar(
   market: 'BR' | 'US' | 'FR' | 'ES',
@@ -845,7 +845,12 @@ export async function fetchAutonomousNicheRadar(
           shortsPct: Math.round(
             (withOut.filter((e) => e.isShort).length / withOut.length) * 100
           ),
+          estimatedRpm: 4.5,
+          competitionLevel: 'Média',
+          uniqueChannelsPct: 75,
+          risingKeywords: [meta.query],
           topVideo: withOut[0] || null,
+          topVideos: withOut.slice(0, 3),
         });
       }
 

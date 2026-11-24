@@ -257,6 +257,18 @@ export interface CompetitorChannel {
   lastSyncedAt: string;
 }
 
+export interface AutoNicheVideoSample {
+  id: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string;
+  views: number;
+  viewsPerDay: number;
+  daysAgo: number;
+  outlierScore: number;
+  isShort: boolean;
+}
+
 export interface AutoNicheTrend {
   id: string;
   name: string;
@@ -269,15 +281,12 @@ export interface AutoNicheTrend {
   maxOutlier: number;
   recentCount: number;
   shortsPct: number;
-  topVideo: {
-    id: string;
-    title: string;
-    channelTitle: string;
-    thumbnailUrl: string;
-    views: number;
-    viewsPerDay: number;
-    daysAgo: number;
-    outlierScore: number;
-    isShort: boolean;
-  } | null;
+  estimatedRpm: number;
+  competitionLevel: 'Baixa' | 'Média' | 'Alta';
+  uniqueChannelsPct: number;
+  isEmergentDiscovery?: boolean;
+  usArbitrageGap?: number; // >1.5 means exploding harder in US than locally (wave incoming!)
+  risingKeywords: string[];
+  topVideo: AutoNicheVideoSample | null;
+  topVideos: AutoNicheVideoSample[];
 }

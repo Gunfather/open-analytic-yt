@@ -137,7 +137,63 @@ function youtubePublicProxyPlugin(): Plugin {
         }
       });
 
-      const scrapePublicYouTubeSearch = async (q: string, gl: string, hl: string) => {
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      async function mapWithConcurrency<T, R>(
+        items: readonly T[],
+        concurrency: number,
+        staggerMs: number,
+        worker: (item: T, index: number) => Promise<R>
+      ): Promise<R[]> {
+        const results: R[] = new Array(items.length);
+        let cursor = 0;
+        const runners = Array.from({ length: Math.min(concurrency, items.length) }, async (_, rIdx) => {
+          if (rIdx > 0) await sleep(rIdx * staggerMs);
+          while (true) {
+            const idx = cursor++;
+            if (idx >= items.length) break;
+            results[idx] = await worker(items[idx], idx);
+            if (staggerMs > 0) await sleep(staggerMs);
+          }
+        });
+        await Promise.all(runners);
+        return results;
+      }
+
+      const fetchYouTubeSuggest = async (q: string, gl: string, hl: string): Promise<string[]> => {
+        try {
+          const url = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&hl=${encodeURIComponent(
+            hl
+          )}&gl=${encodeURIComponent(gl)}&q=${encodeURIComponent(q)}`;
+          const r = await fetch(url, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            },
+          });
+          if (!r.ok) return [];
+          const json = (await r.json()) as [string, string[]];
+          return Array.isArray(json?.[1])
+            ? json[1].map((s) => String(s).trim()).filter((s) => s.length > 3)
+            : [];
+        } catch {
+          return [];
+        }
+      };
+
+      const scrapePublicYouTubeSearch = async (q: string, gl: string, hl: string, attempt = 0): Promise<Array<{
+        id: string;
+        title: string;
+        channelId: string;
+        channelTitle: string;
+        channelHandle?: string;
+        publishedAt: string;
+        daysAgo: number;
+        thumbnailUrl: string;
+        durationSec: number;
+        isShort: boolean;
+        views: number;
+      }>> => {
         const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
           q
         )}&gl=${encodeURIComponent(gl)}&hl=${encodeURIComponent(hl)}`;
@@ -147,19 +203,37 @@ function youtubePublicProxyPlugin(): Plugin {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept-Language': `${hl},en-US;q=0.8,en;q=0.7`,
+            Cookie:
+              'SOCS=CAISHAgBEhJnd3NfMjAyMzA4MTAtMF9SQzIaAmVuIAEaBgiAo_CmBg; CONSENT=YES+cb',
           },
         });
 
         if (!pageRes.ok) {
+          if (attempt < 1) {
+            await sleep(350);
+            return scrapePublicYouTubeSearch(q, gl, hl, attempt + 1);
+          }
           throw new Error(`YouTube search HTTP ${pageRes.status}`);
         }
 
         const html = await pageRes.text();
         const marker = 'var ytInitialData = ';
-        const startIdx = html.indexOf(marker);
-        if (startIdx === -1) return [];
+        let startIdx = html.indexOf(marker);
+        let offset = marker.length;
+        if (startIdx === -1) {
+          const altMarker = 'window["ytInitialData"] = ';
+          startIdx = html.indexOf(altMarker);
+          offset = altMarker.length;
+        }
+        if (startIdx === -1) {
+          if (attempt < 1) {
+            await sleep(350);
+            return scrapePublicYouTubeSearch(q, gl, hl, attempt + 1);
+          }
+          return [];
+        }
 
-        const afterMarker = html.slice(startIdx + marker.length);
+        const afterMarker = html.slice(startIdx + offset);
         const endIdx = afterMarker.indexOf(';</script>');
         const jsonStr = endIdx !== -1 ? afterMarker.slice(0, endIdx) : '';
         const initialData = JSON.parse(jsonStr);
@@ -222,7 +296,7 @@ function youtubePublicProxyPlugin(): Plugin {
           return 14;
         };
 
-        return renderers
+        const parsedItems = renderers
           .slice(0, 24)
           .map((vr: any) => {
             const videoId = String(vr.videoId || '');
@@ -245,7 +319,9 @@ function youtubePublicProxyPlugin(): Plugin {
               '0';
             const views = parseCompactViews(viewText);
             const lengthText = vr.lengthText?.simpleText || '';
-            const isShortOverlay = JSON.stringify(vr.thumbnailOverlays || []).includes('SHORTS');
+            const isShortOverlay =
+              Boolean(vr.navigationEndpoint?.reelWatchEndpoint) ||
+              JSON.stringify(vr.thumbnailOverlays || []).includes('SHORTS');
             const durationSec = isShortOverlay && !lengthText ? 45 : parseDurationText(lengthText);
             const pubText = vr.publishedTimeText?.simpleText || '';
             const daysAgo = parseDaysAgo(pubText);
@@ -271,18 +347,38 @@ function youtubePublicProxyPlugin(): Plugin {
               views,
             };
           })
-          .filter((item) => Boolean(item.id));
+          .filter((item) => Boolean(item.id) && item.views > 0);
+
+        if (parsedItems.length === 0 && attempt < 1) {
+          await sleep(350);
+          return scrapePublicYouTubeSearch(q, gl, hl, attempt + 1);
+        }
+        return parsedItems;
       };
 
       const radarMemoryCache = new Map<
         string,
-        { savedAt: number; scannedAt: string; trends: unknown[] }
+        { savedAt: number; scannedAt: string; trends: any[] }
       >();
+
+      const MARKET_RPM_FACTOR: Record<'BR' | 'US' | 'FR' | 'ES', number> = {
+        US: 1.0,
+        FR: 0.72,
+        ES: 0.46,
+        BR: 0.38,
+      };
 
       const AUTO_NICHE_SEEDS = [
         {
           id: 'biblical-arch',
           icon: '🏺',
+          baseUsRpm: 7.2,
+          suggestStem: {
+            BR: 'arqueologia biblica ',
+            US: 'biblical archaeology ',
+            FR: 'archeologie biblique ',
+            ES: 'arqueologia biblica ',
+          },
           names: {
             BR: 'Arqueologia & Enigmas Bíblicos',
             US: 'Biblical Archaeology & Mysteries',
@@ -297,24 +393,15 @@ function youtubePublicProxyPlugin(): Plugin {
           },
         },
         {
-          id: 'dark-psych',
-          icon: '🧠',
-          names: {
-            BR: 'Psicologia & Comportamento Humano',
-            US: 'Human Behavior & Psychology',
-            FR: 'Psychologie & Comportement Humain',
-            ES: 'Psicología & Comportamiento Humano',
-          },
-          queries: {
-            BR: 'psicologia comportamento humano mente fatos',
-            US: 'human behavior psychology facts mind',
-            FR: 'psychologie comportement humain faits',
-            ES: 'psicologia comportamiento humano mente',
-          },
-        },
-        {
           id: 'ancient-civ',
           icon: '🏛️',
+          baseUsRpm: 6.8,
+          suggestStem: {
+            BR: 'civilizacoes antigas ',
+            US: 'ancient civilizations ',
+            FR: 'civilisations anciennes ',
+            ES: 'civilizaciones antiguas ',
+          },
           names: {
             BR: 'Civilizações Antigas & História',
             US: 'Ancient Civilizations & Lost History',
@@ -329,8 +416,38 @@ function youtubePublicProxyPlugin(): Plugin {
           },
         },
         {
+          id: 'dark-psych',
+          icon: '🧠',
+          baseUsRpm: 6.4,
+          suggestStem: {
+            BR: 'psicologia comportamento ',
+            US: 'human psychology ',
+            FR: 'psychologie comportement ',
+            ES: 'psicologia comportamiento ',
+          },
+          names: {
+            BR: 'Psicologia & Comportamento Humano',
+            US: 'Human Behavior & Psychology',
+            FR: 'Psychologie & Comportement Humain',
+            ES: 'Psicología & Comportamiento Humano',
+          },
+          queries: {
+            BR: 'psicologia comportamento humano mente fatos',
+            US: 'human behavior psychology facts mind',
+            FR: 'psychologie comportement humain faits',
+            ES: 'psicologia comportamiento humano mente',
+          },
+        },
+        {
           id: 'unsolved-mysteries',
           icon: '🕵️',
+          baseUsRpm: 6.9,
+          suggestStem: {
+            BR: 'misterios inexplicaveis ',
+            US: 'unsolved mysteries ',
+            FR: 'mysteres inexpliques ',
+            ES: 'misterios sin resolver ',
+          },
           names: {
             BR: 'Mistérios & Casos Inexplicáveis',
             US: 'Unsolved Mysteries & Cold Cases',
@@ -347,6 +464,13 @@ function youtubePublicProxyPlugin(): Plugin {
         {
           id: 'space-cosmos',
           icon: '🌌',
+          baseUsRpm: 7.8,
+          suggestStem: {
+            BR: 'descoberta universo ',
+            US: 'james webb discovery ',
+            FR: 'decouverte univers ',
+            ES: 'descubrimiento universo ',
+          },
           names: {
             BR: 'Universo, Espaço & Astronomia',
             US: 'Space, Cosmos & James Webb',
@@ -354,7 +478,7 @@ function youtubePublicProxyPlugin(): Plugin {
             ES: 'Universo, Espacio & Astronomía',
           },
           queries: {
-            BR: 'universo espaco descoberta james webb astronomia',
+            BR: 'universo espaco descoberta telescopio astronomia',
             US: 'james webb space discovery universe documentary',
             FR: 'univers espace decouverte astronomie',
             ES: 'universo espacio descubrimiento astronomia',
@@ -363,6 +487,13 @@ function youtubePublicProxyPlugin(): Plugin {
         {
           id: 'ai-future',
           icon: '🤖',
+          baseUsRpm: 10.5,
+          suggestStem: {
+            BR: 'inteligencia artificial ',
+            US: 'ai agents future ',
+            FR: 'intelligence artificielle ',
+            ES: 'inteligencia artificial ',
+          },
           names: {
             BR: 'IA, Robótica & Futuro',
             US: 'AI Breakthroughs & Future Tech',
@@ -370,8 +501,8 @@ function youtubePublicProxyPlugin(): Plugin {
             ES: 'IA, Robótica & Futuro',
           },
           queries: {
-            BR: 'inteligencia artificial futuro tecnologia revolucao',
-            US: 'ai breakthrough future technology agents',
+            BR: 'inteligencia artificial futuro tecnologia',
+            US: 'ai breakthrough future technology documentary',
             FR: 'intelligence artificielle futur technologie',
             ES: 'inteligencia artificial futuro tecnologia',
           },
@@ -379,6 +510,13 @@ function youtubePublicProxyPlugin(): Plugin {
         {
           id: 'geopolitics-econ',
           icon: '🌍',
+          baseUsRpm: 9.8,
+          suggestStem: {
+            BR: 'geopolitica economia ',
+            US: 'geopolitics economy ',
+            FR: 'geopolitique economie ',
+            ES: 'geopolitica economia ',
+          },
           names: {
             BR: 'Geopolítica & Economia Global',
             US: 'Geopolitics & Global Economy',
@@ -386,15 +524,22 @@ function youtubePublicProxyPlugin(): Plugin {
             ES: 'Geopolítica & Economía Global',
           },
           queries: {
-            BR: 'geopolitica economia global crise imperios',
+            BR: 'geopolitica mundial economia historia',
             US: 'geopolitics global economy documentary',
-            FR: 'geopolitique economie mondiale analyse',
+            FR: 'geopolitique economie mondiale documentaire',
             ES: 'geopolitica economia mundial documental',
           },
         },
         {
           id: 'neuro-longevity',
           icon: '🧬',
+          baseUsRpm: 8.6,
+          suggestStem: {
+            BR: 'neurociencia cerebro ',
+            US: 'neuroscience brain ',
+            FR: 'neurosciences cerveau ',
+            ES: 'neurociencia cerebro ',
+          },
           names: {
             BR: 'Neurociência, Corpo & Longevidade',
             US: 'Neuroscience, Brain & Longevity',
@@ -402,13 +547,184 @@ function youtubePublicProxyPlugin(): Plugin {
             ES: 'Neurociencia, Cerebro & Longevidad',
           },
           queries: {
-            BR: 'neurociencia cerebro dopamina ciencia corpo humano',
+            BR: 'neurociencia cerebro dopamina habitos ciencia',
             US: 'neuroscience brain dopamine longevity science',
-            FR: 'neurosciences cerveau dopamine science',
-            ES: 'neurociencia cerebro dopamina ciencia',
+            FR: 'neurosciences cerveau habitudes sante',
+            ES: 'neurociencia cerebro dopamina salud',
+          },
+        },
+        {
+          id: 'stoicism-philo',
+          icon: '🗿',
+          baseUsRpm: 6.2,
+          suggestStem: {
+            BR: 'filosofia estoicismo ',
+            US: 'stoicism philosophy ',
+            FR: 'philosophie stoicisme ',
+            ES: 'filosofia estoicismo ',
+          },
+          names: {
+            BR: 'Filosofia, Estoicismo & Sabedoria',
+            US: 'Philosophy, Stoicism & Wisdom',
+            FR: 'Philosophie, Stoïcisme & Sagesse',
+            ES: 'Filosofía, Estoicismo & Sabiduría',
+          },
+          queries: {
+            BR: 'estoicismo filosofia sabedoria antiga mente',
+            US: 'stoicism ancient philosophy wisdom life',
+            FR: 'stoicisme philosophie sagesse antique',
+            ES: 'estoicismo filosofia sabiduria antigua',
+          },
+        },
+        {
+          id: 'wealth-empires',
+          icon: '💎',
+          baseUsRpm: 12.4,
+          suggestStem: {
+            BR: 'historia dos bilionarios ',
+            US: 'rise and fall business ',
+            FR: 'histoire entreprise fortune ',
+            ES: 'historia imperios financieros ',
+          },
+          names: {
+            BR: 'Finanças, Impérios & Negócios',
+            US: 'Financial Empires & Business Docs',
+            FR: 'Empires Financiers & Business',
+            ES: 'Imperios Financieros & Negocios',
+          },
+          queries: {
+            BR: 'ascensao e queda empresas dinheiro documentario',
+            US: 'rise and fall company documentary finance',
+            FR: 'ascension et chute entreprise documentaire',
+            ES: 'ascenso y caida empresas documental finanzas',
           },
         },
       ] as const;
+
+      const DISCOVERY_STEMS: Record<'BR' | 'US' | 'FR' | 'ES', string[]> = {
+        BR: ['a verdade oculta sobre ', 'o misterio de ', 'por que ninguem fala sobre '],
+        US: ['why nobody talks about ', 'the untold truth about ', 'the dark history of '],
+        FR: ['le mystere cache de ', 'la verite sur ', 'pourquoi personne ne parle de '],
+        ES: ['la verdad oculta de ', 'el misterio de ', 'por que nadie habla de '],
+      };
+
+      const evaluateScrapedPool = (
+        allItems: Awaited<ReturnType<typeof scrapePublicYouTubeSearch>>,
+        meta: {
+          id: string;
+          name: string;
+          icon: string;
+          query: string;
+          market: 'BR' | 'US' | 'FR' | 'ES';
+          estimatedRpm: number;
+          isEmergentDiscovery?: boolean;
+          risingKeywords: string[];
+        }
+      ) => {
+        const recent = allItems.filter((v) => v.daysAgo <= 60 && v.views > 0);
+        const pool = recent.length >= 3 ? recent : allItems.filter((v) => v.views > 0);
+
+        if (pool.length === 0) {
+          return null;
+        }
+
+        const sortedViews = [...pool.map((i) => i.views)].sort((a, b) => a - b);
+        const medianViews = Math.max(
+          sortedViews[Math.floor(sortedViews.length / 2)] || 1500,
+          250
+        );
+
+        const uniqueChannels = new Set(
+          pool.map((v) => v.channelId || v.channelTitle.toLowerCase())
+        ).size;
+        const uniqueChannelsPct = Math.round((uniqueChannels / pool.length) * 100);
+
+        const enriched = pool.map((v) => {
+          const days = Math.max(1, v.daysAgo);
+          const viewsPerDay = Math.round(v.views / days);
+          const outlierScore = Number((v.views / medianViews).toFixed(1));
+          return { ...v, viewsPerDay, outlierScore };
+        });
+
+        const avgViewsPerDay = Math.round(
+          enriched.reduce((s, v) => s + v.viewsPerDay, 0) / enriched.length
+        );
+        const sortedByVelocity = [...enriched].sort(
+          (a, b) =>
+            b.viewsPerDay * Math.min(b.outlierScore, 8) -
+            a.viewsPerDay * Math.min(a.outlierScore, 8)
+        );
+        const maxOutlier = Number(
+          Math.max(...enriched.map((e) => e.outlierScore), 1.1).toFixed(1)
+        );
+        const breakoutsCount = enriched.filter(
+          (e) => e.daysAgo <= 30 && e.outlierScore >= 1.6
+        ).length;
+        const shortsPct = Math.round(
+          (enriched.filter((e) => e.isShort).length / enriched.length) * 100
+        );
+
+        const velScore = Math.min(
+          46,
+          Math.round(Math.log10(Math.max(avgViewsPerDay, 20)) * 10.2)
+        );
+        const outScore = Math.min(30, Math.round(maxOutlier * 3.8));
+        const freshScore = Math.min(15, breakoutsCount * 3.5);
+        const diversityBonus = uniqueChannelsPct >= 75 ? 8 : uniqueChannelsPct >= 55 ? 4 : 0;
+        const heatScore = Math.max(
+          38,
+          Math.min(99, Math.round(velScore + outScore + freshScore + diversityBonus))
+        );
+
+        const competitionLevel: 'Baixa' | 'Média' | 'Alta' =
+          uniqueChannelsPct >= 75 && maxOutlier >= 3
+            ? 'Baixa'
+            : uniqueChannelsPct >= 55
+            ? 'Média'
+            : 'Alta';
+
+        const statusLabel =
+          heatScore >= 84
+            ? 'Explodindo Agora'
+            : heatScore >= 70
+            ? 'Em Forte Alta'
+            : heatScore >= 56
+            ? 'Acelerando'
+            : 'Oportunidade Estável';
+
+        const topSamples = sortedByVelocity.slice(0, 3).map((v) => ({
+          id: v.id,
+          title: v.title,
+          channelTitle: v.channelTitle,
+          thumbnailUrl: v.thumbnailUrl,
+          views: v.views,
+          viewsPerDay: v.viewsPerDay,
+          daysAgo: v.daysAgo,
+          outlierScore: v.outlierScore,
+          isShort: v.isShort,
+        }));
+
+        return {
+          id: meta.id,
+          name: meta.name,
+          icon: meta.icon,
+          query: meta.query,
+          market: meta.market,
+          heatScore,
+          statusLabel,
+          avgViewsPerDay,
+          maxOutlier,
+          recentCount: enriched.filter((e) => e.daysAgo <= 30).length,
+          shortsPct,
+          estimatedRpm: meta.estimatedRpm,
+          competitionLevel,
+          uniqueChannelsPct,
+          isEmergentDiscovery: Boolean(meta.isEmergentDiscovery),
+          risingKeywords: meta.risingKeywords.slice(0, 4),
+          topVideo: topSamples[0] || null,
+          topVideos: topSamples,
+        };
+      };
 
       server.middlewares.use('/api/niche-radar', async (req, res) => {
         try {
@@ -440,129 +756,125 @@ function youtubePublicProxyPlugin(): Plugin {
             return;
           }
 
-          const trends = await Promise.all(
-            AUTO_NICHE_SEEDS.map(async (seed) => {
+          // 1) Autonomous Open-World Discovery via real-time YouTube Autocomplete Stems
+          const stemSuggestionsNested = await Promise.all(
+            DISCOVERY_STEMS[market].map((stem) =>
+              fetchYouTubeSuggest(stem, market, hlMap[market])
+            )
+          );
+          const discoveredQueries = Array.from(
+            new Set(stemSuggestionsNested.flat())
+          ).slice(0, 2);
+
+          // 2) Scan Core 10 Verticals with controlled concurrency (3 at a time) -> 0 throttling!
+          const rpmFactor = MARKET_RPM_FACTOR[market];
+          const coreResults = await mapWithConcurrency(
+            AUTO_NICHE_SEEDS,
+            3,
+            130,
+            async (seed) => {
               const q = seed.queries[market];
-              try {
-                const allItems = await scrapePublicYouTubeSearch(q, market, hlMap[market]);
-                const recent = allItems.filter((v) => v.daysAgo <= 60 && v.views > 0);
-                const pool = recent.length >= 3 ? recent : allItems.filter((v) => v.views > 0);
-
-                if (pool.length === 0) {
-                  return {
-                    id: seed.id,
-                    name: seed.names[market],
-                    icon: seed.icon,
-                    query: q,
-                    market,
-                    heatScore: 25,
-                    statusLabel: 'Estável',
-                    avgViewsPerDay: 0,
-                    maxOutlier: 1,
-                    recentCount: 0,
-                    shortsPct: 0,
-                    topVideo: null,
-                  };
-                }
-
-                const sortedViews = [...pool.map((i) => i.views)].sort((a, b) => a - b);
-                const medianViews = Math.max(
-                  sortedViews[Math.floor(sortedViews.length / 2)] || 1500,
-                  250
-                );
-
-                const enriched = pool.map((v) => {
-                  const days = Math.max(1, v.daysAgo);
-                  const viewsPerDay = Math.round(v.views / days);
-                  const outlierScore = Number((v.views / medianViews).toFixed(1));
-                  return { ...v, viewsPerDay, outlierScore };
-                });
-
-                const avgViewsPerDay = Math.round(
-                  enriched.reduce((s, v) => s + v.viewsPerDay, 0) / enriched.length
-                );
-                const sortedByVelocity = [...enriched].sort(
-                  (a, b) =>
-                    b.viewsPerDay * Math.min(b.outlierScore, 6) -
-                    a.viewsPerDay * Math.min(a.outlierScore, 6)
-                );
-                const best = sortedByVelocity[0];
-                const maxOutlier = Number(
-                  Math.max(...enriched.map((e) => e.outlierScore), 1).toFixed(1)
-                );
-                const breakoutsCount = enriched.filter(
-                  (e) => e.daysAgo <= 30 && e.outlierScore >= 1.6
-                ).length;
-                const shortsPct = Math.round(
-                  (enriched.filter((e) => e.isShort).length / enriched.length) * 100
-                );
-
-                const velScore = Math.min(
-                  48,
-                  Math.round(Math.log10(Math.max(avgViewsPerDay, 20)) * 10.5)
-                );
-                const outScore = Math.min(32, Math.round(maxOutlier * 4.2));
-                const freshScore = Math.min(19, breakoutsCount * 4);
-                const heatScore = Math.max(
-                  30,
-                  Math.min(99, velScore + outScore + freshScore)
-                );
-
-                const statusLabel =
-                  heatScore >= 82
-                    ? 'Explodindo Agora'
-                    : heatScore >= 68
-                    ? 'Em Forte Alta'
-                    : heatScore >= 52
-                    ? 'Acelerando'
-                    : 'Aquecendo';
-
-                return {
-                  id: seed.id,
-                  name: seed.names[market],
-                  icon: seed.icon,
-                  query: q,
-                  market,
-                  heatScore,
-                  statusLabel,
-                  avgViewsPerDay,
-                  maxOutlier,
-                  recentCount: enriched.filter((e) => e.daysAgo <= 30).length,
-                  shortsPct,
-                  topVideo: best
-                    ? {
-                        id: best.id,
-                        title: best.title,
-                        channelTitle: best.channelTitle,
-                        thumbnailUrl: best.thumbnailUrl,
-                        views: best.views,
-                        viewsPerDay: best.viewsPerDay,
-                        daysAgo: best.daysAgo,
-                        outlierScore: best.outlierScore,
-                        isShort: best.isShort,
-                      }
-                    : null,
-                };
-              } catch {
-                return {
-                  id: seed.id,
-                  name: seed.names[market],
-                  icon: seed.icon,
-                  query: q,
-                  market,
-                  heatScore: 20,
-                  statusLabel: 'Aguardando',
-                  avgViewsPerDay: 0,
-                  maxOutlier: 1,
-                  recentCount: 0,
-                  shortsPct: 0,
-                  topVideo: null,
-                };
-              }
-            })
+              const [items, suggestions] = await Promise.all([
+                scrapePublicYouTubeSearch(q, market, hlMap[market]).catch(() => []),
+                fetchYouTubeSuggest(seed.suggestStem[market], market, hlMap[market]),
+              ]);
+              return evaluateScrapedPool(items, {
+                id: seed.id,
+                name: seed.names[market],
+                icon: seed.icon,
+                query: q,
+                market,
+                estimatedRpm: Number((seed.baseUsRpm * rpmFactor).toFixed(2)),
+                risingKeywords: suggestions,
+              });
+            }
           );
 
-          const ranked = trends.sort(
+          // 3) Scan Autonomous Emergent Micro-Niches discovered from live YouTube Suggest
+          const emergentResults = await mapWithConcurrency(
+            discoveredQueries,
+            2,
+            130,
+            async (discQuery, idx) => {
+              const [items, related] = await Promise.all([
+                scrapePublicYouTubeSearch(discQuery, market, hlMap[market]).catch(() => []),
+                fetchYouTubeSuggest(discQuery, market, hlMap[market]),
+              ]);
+              const formattedTitle =
+                discQuery.charAt(0).toUpperCase() + discQuery.slice(1);
+              return evaluateScrapedPool(items, {
+                id: `emergent-${idx}-${Date.now()}`,
+                name: formattedTitle,
+                icon: '🚀',
+                query: discQuery,
+                market,
+                estimatedRpm: Number((7.0 * rpmFactor).toFixed(2)),
+                isEmergentDiscovery: true,
+                risingKeywords: related,
+              });
+            }
+          );
+
+          let validTrends = [...coreResults, ...emergentResults].filter(
+            (x): x is NonNullable<typeof x> => x !== null
+          );
+
+          // 4) Compute US Arbitrage Gap if user is browsing BR, FR, or ES and US cache exists (or warm US background)
+          if (market !== 'US') {
+            const usCached = radarMemoryCache.get('US');
+            if (usCached) {
+              const usMap = new Map(
+                usCached.trends.map((t: any) => [t.id, t.avgViewsPerDay || 0])
+              );
+              validTrends = validTrends.map((t) => {
+                const usVel = Number(usMap.get(t.id) || 0);
+                const gap =
+                  usVel > 0
+                    ? Number((usVel / Math.max(t.avgViewsPerDay, 300)).toFixed(1))
+                    : undefined;
+                return gap && gap >= 1.5 ? { ...t, usArbitrageGap: gap } : t;
+              });
+            } else {
+              // Warm US cache asynchronously in background without blocking current response!
+              void (async () => {
+                try {
+                  const usRes = await mapWithConcurrency(
+                    AUTO_NICHE_SEEDS.slice(0, 6),
+                    2,
+                    200,
+                    async (seed) => {
+                      const items = await scrapePublicYouTubeSearch(
+                        seed.queries.US,
+                        'US',
+                        'en'
+                      ).catch(() => []);
+                      return evaluateScrapedPool(items, {
+                        id: seed.id,
+                        name: seed.names.US,
+                        icon: seed.icon,
+                        query: seed.queries.US,
+                        market: 'US',
+                        estimatedRpm: seed.baseUsRpm,
+                        risingKeywords: [],
+                      });
+                    }
+                  );
+                  const cleanUs = usRes.filter(Boolean);
+                  if (cleanUs.length > 0) {
+                    radarMemoryCache.set('US', {
+                      savedAt: Date.now(),
+                      scannedAt: new Date().toISOString(),
+                      trends: cleanUs,
+                    });
+                  }
+                } catch {
+                  // ignore background warm errors
+                }
+              })();
+            }
+          }
+
+          const ranked = validTrends.sort(
             (a, b) => b.heatScore - a.heatScore || b.avgViewsPerDay - a.avgViewsPerDay
           );
           const scannedAt = new Date().toISOString();
