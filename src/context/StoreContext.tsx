@@ -94,8 +94,8 @@ interface StoreContextValue {
   }) => ChannelGroup;
   deleteGroup: (id: string) => void;
   syncAllChannels: () => Promise<void>;
-  autoSyncEnabled: boolean;
-  setAutoSyncEnabled: (enabled: boolean) => void;
+  autoSyncMinutes: 0 | 2 | 10 | 20;
+  setAutoSyncMinutes: (minutes: 0 | 2 | 10 | 20) => void;
   syncChannelVideos: (channelId: string) => Promise<void>;
   importYouTubeStudioCsv: (channelId: string, csvText: string) => number;
   scheduledTasks: ScheduledTask[];
@@ -193,14 +193,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
     return 'en';
   });
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {
+  const [autoSyncMinutes, setAutoSyncMinutesState] = useState<0 | 2 | 10 | 20>(() => {
     try {
-      const saved = localStorage.getItem('pulseyt_auto_sync');
-      return saved === null ? true : saved === 'true';
+      const savedMins = localStorage.getItem('pulseyt_auto_sync_minutes');
+      if (savedMins !== null) {
+        const parsed = Number(savedMins);
+        if (parsed === 0 || parsed === 2 || parsed === 10 || parsed === 20) {
+          return parsed;
+        }
+      }
+      const legacySaved = localStorage.getItem('pulseyt_auto_sync');
+      if (legacySaved === 'false') return 0;
     } catch {
-      return true;
+      // ignore
     }
+    return 20;
   });
+  const setAutoSyncMinutes = (minutes: 0 | 2 | 10 | 20) => {
+    setAutoSyncMinutesState(minutes);
+    try {
+      localStorage.setItem('pulseyt_auto_sync_minutes', String(minutes));
+      localStorage.setItem('pulseyt_auto_sync', String(minutes > 0));
+    } catch {
+      // ignore
+    }
+  };
   const syncRef = useRef<() => Promise<void>>();
   const isSyncingRef = useRef(false);
 
@@ -219,14 +236,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const t = (key: TranslationKeys): string => {
     return TRANSLATIONS[uiLanguage]?.[key] ?? TRANSLATIONS.en[key];
   };
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('pulseyt_auto_sync', String(autoSyncEnabled));
-    } catch {
-      // ignore
-    }
-  }, [autoSyncEnabled]);
 
   useEffect(() => {
     try {
@@ -622,14 +631,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    if (!autoSyncEnabled) return;
+    if (autoSyncMinutes <= 0) return;
     const intervalId = window.setInterval(() => {
       if (!isSyncingRef.current && syncRef.current) {
         void syncRef.current();
       }
-    }, 20 * 60 * 1000);
+    }, autoSyncMinutes * 60 * 1000);
     return () => window.clearInterval(intervalId);
-  }, [autoSyncEnabled]);
+  }, [autoSyncMinutes]);
 
   const syncChannelVideos = async (channelId: string) => {
     const ch = state.channels.find((c) => c.id === channelId);
@@ -1031,8 +1040,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         addGroup,
         deleteGroup,
         syncAllChannels,
-        autoSyncEnabled,
-        setAutoSyncEnabled,
+        autoSyncMinutes,
+        setAutoSyncMinutes,
         syncChannelVideos,
         importYouTubeStudioCsv,
         scheduledTasks: state.scheduledTasks || [],

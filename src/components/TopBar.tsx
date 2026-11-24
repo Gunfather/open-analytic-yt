@@ -25,8 +25,10 @@ export function TopBar() {
     setSelectedChannelId,
     isSyncing,
     syncAllChannels,
-    autoSyncEnabled,
-    setAutoSyncEnabled,
+    autoSyncMinutes,
+    setAutoSyncMinutes,
+    apiKey,
+    setActiveTab,
     uiLanguage,
     setUiLanguage,
     t,
@@ -89,11 +91,10 @@ export function TopBar() {
                   onClick={() =>
                     setSelectedChannelId(isSelected ? 'all' : ch.id)
                   }
-                  className={`relative w-8 h-8 rounded-full overflow-hidden border-2 transition-transform hover:scale-110 hover:z-10 cursor-pointer ${
-                    isSelected
+                  className={`relative w-8 h-8 rounded-full overflow-hidden border-2 transition-transform hover:scale-110 hover:z-10 cursor-pointer ${isSelected
                       ? 'border-orange-500 ring-2 ring-orange-500/40 z-10 scale-110'
                       : 'border-[#0e131a]'
-                  }`}
+                    }`}
                 >
                   <img
                     src={ch.avatarUrl}
@@ -173,26 +174,60 @@ export function TopBar() {
             {isSyncing ? t('syncingBtn') : t('syncBtn')}
           </button>
 
-          <button
-            onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+          <div
             title={
-              autoSyncEnabled
-                ? 'Sincronização automática a cada 20 minutos ativada — clique para pausar'
-                : 'Sincronização automática pausada — clique para ativar'
+              autoSyncMinutes > 0
+                ? `Sincronização automática a cada ${autoSyncMinutes} min (${
+                    apiKey ? 'via YouTube API v3' : 'via Feed Público — configure a API Key em Configurações'
+                  })`
+                : 'Sincronização automática pausada'
             }
-            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-semibold border transition cursor-pointer ${
-              autoSyncEnabled
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-                : 'bg-[#131a24] text-slate-400 border-slate-800 hover:text-slate-200'
-            }`}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border transition ${
+              autoSyncMinutes > 0
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                : 'bg-[#131a24] text-slate-400 border-slate-800'
+              }`}
           >
             <span
-              className={`w-2 h-2 rounded-full ${
-                autoSyncEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                autoSyncMinutes > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
               }`}
             />
-            Auto 20m
-          </button>
+            <select
+              value={autoSyncMinutes}
+              onChange={(e) => setAutoSyncMinutes(Number(e.target.value) as 0 | 2 | 10 | 20)}
+              className="bg-transparent text-[11px] font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value={2} className="bg-[#131a24] text-slate-100">
+                Auto 2m
+              </option>
+              <option value={10} className="bg-[#131a24] text-slate-100">
+                Auto 10m
+              </option>
+              <option value={20} className="bg-[#131a24] text-slate-100">
+                Auto 20m
+              </option>
+              <option value={0} className="bg-[#131a24] text-slate-100">
+                Auto Off
+              </option>
+            </select>
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              title={
+                apiKey
+                  ? 'A sincronizar pela YouTube Data API v3 (clique para abrir Configurações)'
+                  : 'Sem YouTube API Key — a usar Feed Público (clique para configurar a API)'
+              }
+              className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider cursor-pointer transition ${
+                apiKey
+                  ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                  : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
+              }`}
+            >
+              {apiKey ? 'API' : 'RSS'}
+            </button>
+          </div>
 
           <button
             onClick={() => setShowAiModal(true)}
@@ -244,11 +279,10 @@ export function TopBar() {
               setSelectedLanguageId('all');
               setSelectedChannelId('all');
             }}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-              selectedLanguageId === 'all'
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${selectedLanguageId === 'all'
                 ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
                 : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
+              }`}
           >
             {t('allLabel')} ({channels.filter((c) => c.isActive).length})
           </button>
@@ -265,11 +299,10 @@ export function TopBar() {
                   setSelectedLanguageId(isSelected ? 'all' : lang.id);
                   setSelectedChannelId('all');
                 }}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
-                  isSelected
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${isSelected
                     ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
                     : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
+                  }`}
               >
                 <span>{lang.flag}</span>
                 <span>{lang.name}</span>
@@ -295,11 +328,10 @@ export function TopBar() {
               setSelectedGroupId('all');
               setSelectedChannelId('all');
             }}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-              selectedGroupId === 'all'
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${selectedGroupId === 'all'
                 ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
                 : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
+              }`}
           >
             {t('allGroups')}
           </button>
@@ -316,11 +348,10 @@ export function TopBar() {
                   setSelectedGroupId(isSelected ? 'all' : grp.id);
                   setSelectedChannelId('all');
                 }}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
-                  isSelected
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${isSelected
                     ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
                     : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
+                  }`}
               >
                 <span>{grp.icon}</span>
                 <span>{grp.name}</span>
