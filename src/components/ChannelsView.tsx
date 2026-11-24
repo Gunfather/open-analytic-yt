@@ -1119,21 +1119,6 @@ export function ChannelsView() {
                     YouTube
                     <ExternalLink className="w-3 h-3" />
                   </a>
-
-                  <a
-                    href={
-                      ch.youtubeChannelId
-                        ? `https://studio.youtube.com/channel/${ch.youtubeChannelId}/videos/upload?d=ud`
-                        : 'https://studio.youtube.com/'
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Abrir YouTube Studio para carregar vídeo neste canal"
-                    className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-orange-400" />
-                    {t('createBtn')}
-                  </a>
                 </div>
 
                 <div className="flex items-center gap-1">
