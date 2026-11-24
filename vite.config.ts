@@ -264,7 +264,7 @@ function youtubePublicProxyPlugin(): Plugin {
           }
           const clean = lower.replace(/\s+/g, ' ');
           let mult = 1;
-          if (/\bmi|\bm\b|million|milh/i.test(clean)) mult = 1_000_000;
+          if (/\bmi\b|\bm\b|million|milh/i.test(clean)) mult = 1_000_000;
           else if (/\bk\b|\bmil\b/i.test(clean)) mult = 1_000;
 
           if (mult > 1) {
@@ -602,10 +602,10 @@ function youtubePublicProxyPlugin(): Plugin {
       ] as const;
 
       const DISCOVERY_STEMS: Record<'BR' | 'US' | 'FR' | 'ES', string[]> = {
-        BR: ['a verdade oculta sobre ', 'o misterio de ', 'por que ninguem fala sobre '],
-        US: ['why nobody talks about ', 'the untold truth about ', 'the dark history of '],
-        FR: ['le mystere cache de ', 'la verite sur ', 'pourquoi personne ne parle de '],
-        ES: ['la verdad oculta de ', 'el misterio de ', 'por que nadie habla de '],
+        BR: ['documentario misterio ', 'historia proibida ', 'curiosidades sobre o '],
+        US: ['why nobody talks about ', 'untold history documentary ', 'mystery of the '],
+        FR: ['documentaire mystere ', 'histoire interdite ', 'le secret de '],
+        ES: ['documental misterio ', 'historia prohibida ', 'el secreto de '],
       };
 
       const evaluateScrapedPool = (
@@ -770,8 +770,8 @@ function youtubePublicProxyPlugin(): Plugin {
           const rpmFactor = MARKET_RPM_FACTOR[market];
           const coreResults = await mapWithConcurrency(
             AUTO_NICHE_SEEDS,
-            3,
-            130,
+            2,
+            180,
             async (seed) => {
               const q = seed.queries[market];
               const [items, suggestions] = await Promise.all([

@@ -907,8 +907,8 @@ export function DashboardView() {
         </div>
       )}
 
-      {/* Ultra Autonomous Front-Page Niche Radar */}
-      <AutonomousNicheRadar />
+      {/* Compact Front-Page Niche Radar Strip */}
+      <AutonomousNicheRadar mode="compact" />
 
       {/* Hero Stock-Ticker Number Row */}
       <div className="flex flex-wrap items-end justify-between gap-4">

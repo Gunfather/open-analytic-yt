@@ -6,6 +6,7 @@ import {
   Globe2,
   LayoutDashboard,
   PlaySquare,
+  Radar,
   Radio,
   Settings,
   Tv2,
@@ -15,6 +16,7 @@ import { NavTab } from '../types/youtube';
 
 const NAV_ITEMS: Array<{ id: NavTab; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'radar', label: 'Nicho Radar IA', icon: Radar },
   { id: 'channels', label: 'Gerenciar Canais', icon: Tv2 },
   { id: 'videos', label: 'Vídeos', icon: PlaySquare },
   { id: 'analytics', label: 'Analytics de Vídeo', icon: BarChart3 },
@@ -29,6 +31,7 @@ export function Sidebar() {
 
   const navLabels: Record<NavTab, string> = {
     dashboard: t('navDashboard'),
+    radar: t('navRadar'),
     channels: t('navChannels'),
     videos: t('navVideos'),
     analytics: t('navAnalytics'),
@@ -75,6 +78,18 @@ export function Sidebar() {
                   <Icon className="w-4 h-4 shrink-0" />
                   {navLabels[item.id]}
                 </span>
+                {item.id === 'radar' && (
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-emerald-500/20 text-emerald-300'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    AUTO
+                  </span>
+                )}
                 {item.id === 'channels' && (
                   <span
                     className={`text-[11px] font-mono-num px-1.5 py-0.5 rounded-md ${

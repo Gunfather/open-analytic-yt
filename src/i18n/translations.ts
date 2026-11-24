@@ -11,6 +11,7 @@ export const TRANSLATIONS = {
   en: {
     // Sidebar
     navDashboard: 'Dashboard',
+    navRadar: 'Niche Radar AI',
     navChannels: 'Channel Management',
     navVideos: 'Videos',
     navAnalytics: 'Video Analytics',
@@ -26,6 +27,7 @@ export const TRANSLATIONS = {
 
     // TopBar
     tabDashboard: 'Dashboard',
+    tabRadar: 'Autonomous Niche Radar AI',
     tabChannels: 'Channels & Languages',
     tabVideos: 'Published Videos',
     tabAnalytics: 'Video Analytics',
@@ -180,6 +182,7 @@ export const TRANSLATIONS = {
   },
   'pt-BR': {
     navDashboard: 'Dashboard',
+    navRadar: 'Nicho Radar IA',
     navChannels: 'Gerenciar Canais',
     navVideos: 'Vídeos',
     navAnalytics: 'Analytics de Vídeo',
@@ -194,6 +197,7 @@ export const TRANSLATIONS = {
     demoMode: 'Modo Demo',
 
     tabDashboard: 'Dashboard',
+    tabRadar: 'Ultra Nicho Radar Autônomo',
     tabChannels: 'Gerenciar Canais & Idiomas',
     tabVideos: 'Vídeos Publicados',
     tabAnalytics: 'Analytics de Vídeo',
@@ -346,6 +350,7 @@ export const TRANSLATIONS = {
   },
   fr: {
     navDashboard: 'Tableau de bord',
+    navRadar: 'Niche Radar IA',
     navChannels: 'Gérer les chaînes',
     navVideos: 'Vidéos',
     navAnalytics: 'Analytics Vidéo',
@@ -360,6 +365,7 @@ export const TRANSLATIONS = {
     demoMode: 'Mode Démo',
 
     tabDashboard: 'Tableau de bord',
+    tabRadar: 'Ultra Niche Radar Autonome',
     tabChannels: 'Chaînes & Langues',
     tabVideos: 'Vidéos publiées',
     tabAnalytics: 'Analytics Vidéo',
@@ -512,6 +518,7 @@ export const TRANSLATIONS = {
   },
   es: {
     navDashboard: 'Panel',
+    navRadar: 'Nicho Radar IA',
     navChannels: 'Gestionar Canales',
     navVideos: 'Vídeos',
     navAnalytics: 'Analítica de Vídeo',
@@ -526,6 +533,7 @@ export const TRANSLATIONS = {
     demoMode: 'Modo Demo',
 
     tabDashboard: 'Panel',
+    tabRadar: 'Ultra Nicho Radar Autónomo',
     tabChannels: 'Canales e Idiomas',
     tabVideos: 'Vídeos Publicados',
     tabAnalytics: 'Analítica de Vídeo',

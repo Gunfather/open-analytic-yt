@@ -695,7 +695,7 @@ export async function fetchCompetitorChannelSnapshot(params: {
   };
 }
 
-const AUTO_RADAR_STORAGE_KEY = 'open_analytic_auto_radar_v3';
+const AUTO_RADAR_STORAGE_KEY = 'open_analytic_auto_radar_v4';
 
 export async function fetchAutonomousNicheRadar(
   market: 'BR' | 'US' | 'FR' | 'ES',

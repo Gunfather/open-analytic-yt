@@ -2,6 +2,7 @@ import { StoreProvider, useStore } from './context/StoreContext';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { DashboardView } from './components/DashboardView';
+import { AutonomousNicheRadar } from './components/AutonomousNicheRadar';
 import { ChannelsView } from './components/ChannelsView';
 import { VideosView } from './components/VideosView';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -19,6 +20,11 @@ function AppShell() {
         <TopBar />
         <main className="flex-1">
           {activeTab === 'dashboard' && <DashboardView />}
+          {activeTab === 'radar' && (
+            <div className="p-6 max-w-[1680px] mx-auto">
+              <AutonomousNicheRadar mode="full" />
+            </div>
+          )}
           {activeTab === 'channels' && <ChannelsView />}
           {activeTab === 'videos' && <VideosView />}
           {activeTab === 'analytics' && <AnalyticsView />}

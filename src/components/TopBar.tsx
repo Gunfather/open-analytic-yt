@@ -40,6 +40,7 @@ export function TopBar() {
 
   const TAB_TITLES: Record<NavTab, string> = {
     dashboard: t('tabDashboard'),
+    radar: t('tabRadar'),
     channels: t('tabChannels'),
     videos: t('tabVideos'),
     analytics: t('tabAnalytics'),

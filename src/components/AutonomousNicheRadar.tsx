@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  ArrowUpRight,
   Check,
   Compass,
   Copy,
   DollarSign,
+  ExternalLink,
   EyeOff,
   Flame,
   Globe2,
@@ -24,7 +26,11 @@ import { formatCompact, formatCurrency, formatRelativeTime } from '../utils/form
 
 type RadarViewMode = 'all' | 'emergent' | 'rpm' | 'low_comp';
 
-export function AutonomousNicheRadar() {
+interface AutonomousNicheRadarProps {
+  mode?: 'compact' | 'full';
+}
+
+export function AutonomousNicheRadar({ mode = 'full' }: AutonomousNicheRadarProps) {
   const {
     apiKey,
     aiConfig,
@@ -51,7 +57,6 @@ export function AutonomousNicheRadar() {
   const [radarScanning, setRadarScanning] = useState(false);
   const [radarScannedAt, setRadarScannedAt] = useState<string | null>(null);
   const [radarError, setRadarError] = useState<string | null>(null);
-  const [showAllCards, setShowAllCards] = useState(true);
   const [showNicheRadar, setShowNicheRadar] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('pulseyt_show_niche_radar');
@@ -108,14 +113,14 @@ export function AutonomousNicheRadar() {
   };
 
   useEffect(() => {
-    if (!showNicheRadar) return;
+    if (mode === 'compact' && !showNicheRadar) return;
     void runAutonomousScan(radarMarket, false);
     const intervalId = window.setInterval(() => {
       void runAutonomousScan(radarMarket, true);
     }, 20 * 60 * 1000);
     return () => window.clearInterval(intervalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radarMarket, showNicheRadar]);
+  }, [radarMarket, showNicheRadar, mode]);
 
   const displayedTrends = useMemo(() => {
     const list = [...autoTrends];
@@ -211,22 +216,22 @@ export function AutonomousNicheRadar() {
       `• Buscas em Explosão Hoje: ${trend.risingKeywords.join(' · ') || trend.query}`,
       '',
       `🇧🇷 PORTUGUÊS (PT-BR):`,
-      `• Título Magnético: O Detalhe Oculto em "${baseTopic.slice(0, 42)}..." que Mudou a História`,
-      `• Thumbnail: Close dramático de alto contraste + seta sutil + 3 palavras em amarelo ("NINGUÉM VIU ISSO")`,
+      `• Título Magnético: O Detalhe Oculto em "${baseTopic.slice(0, 46)}..." que Mudou a História`,
+      `• Thumbnail: Close dramático de alto contraste + 3 palavras em amarelo ("NINGUÉM VIU ISSO")`,
       `• Gancho (0–15s): "Durante décadas todos repetiram a mesma versão... até que uma descoberta recente revelou o oposto."`,
       '',
       `🇺🇸 INGLÊS (EN — Alto RPM):`,
-      `• Title: The Untold Truth Behind "${baseTopic.slice(0, 42)}..." Nobody Talks About`,
-      `• Thumbnail: Dark cinematic lighting + glowing artifact/subject + bold text ("THE HIDDEN RECORD")`,
+      `• Title: The Untold Truth Behind "${baseTopic.slice(0, 46)}..." Nobody Talks About`,
+      `• Thumbnail: Dark cinematic lighting + glowing subject + bold text ("THE HIDDEN RECORD")`,
       `• Hook (0–15s): "Every textbook skipped this single detail — and once you see it, the entire story changes."`,
       '',
       `🇫🇷 FRANCÊS (FR — Baixa Saturação):`,
-      `• Titre: Le Secret Interdit derrière "${baseTopic.slice(0, 38)}..." enfin révélé !`,
+      `• Titre: Le Secret Interdit derrière "${baseTopic.slice(0, 42)}..." enfin révélé !`,
       `• Miniature: Contraste fort noir/or + texte court ("LE VRAI SECRET")`,
       `• Accroche (0–15s): "C'est l'énigme que les spécialistes ont longtemps évitée, jusqu'à aujourd'hui..."`,
       '',
       `🇪🇸 ESPANHOL (ES — Escala Global):`,
-      `• Título: El Secreto Oculto que Nadie Notó en "${baseTopic.slice(0, 38)}..."`,
+      `• Título: El Secreto Oculto que Nadie Notó en "${baseTopic.slice(0, 42)}..."`,
       `• Miniatura: Escena épica cinematográfica + texto grande blanco/rojo ("LA PRUEBA OCULTA")`,
       `• Gancho (0–15s): "Lo que estás a punto de ver desafía todo lo que creíamos saber sobre este misterio..."`,
     ].join('\n');
@@ -305,527 +310,630 @@ Gere um PACOTE DE ATAQUE IMEDIATO enxuto, magnético e pronto para copiar e prod
     }
   };
 
-  if (!showNicheRadar) {
+  // =========================================================================
+  // COMPACT MODE (FRONT PAGE / DASHBOARD) — Clean, minimal horizontal strip!
+  // =========================================================================
+  if (mode === 'compact') {
+    if (!showNicheRadar) {
+      return (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={toggleNicheRadar}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121720] hover:bg-slate-800 border border-emerald-500/30 text-xs font-semibold text-emerald-300 transition cursor-pointer"
+          >
+            <Radar className="w-3.5 h-3.5 text-emerald-400" />
+            Mostrar Barra do Nicho Radar
+          </button>
+        </div>
+      );
+    }
+
     return (
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={toggleNicheRadar}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#121720] hover:bg-slate-800 border border-emerald-500/30 text-xs font-semibold text-emerald-300 transition cursor-pointer"
-        >
-          <Radar className="w-3.5 h-3.5 text-emerald-400" />
-          Mostrar Ultra Nicho Radar Autônomo
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="rounded-2xl bg-gradient-to-br from-[#0f1922] via-[#121720] to-[#191324] border border-emerald-500/35 shadow-2xl shadow-emerald-950/20 p-5 space-y-4">
-        {/* Top Command Header */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#0f1922] via-[#121720] to-[#181322] border border-emerald-500/30 px-4 py-3 space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-orange-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0">
-              <Radar
-                className={`w-5 h-5 text-emerald-400 ${
-                  radarScanning ? 'animate-spin' : ''
-                }`}
-              />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400" />
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm font-extrabold uppercase tracking-wider text-white">
-                  Ultra Nicho Radar AI
-                </h2>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 text-[10px] font-bold">
-                  {radarScanning
-                    ? 'Escaneando YouTube + Autocomplete ao vivo...'
-                    : `100% Autônomo · ${autoTrends.length} Nichos Mapeados`}
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[10px] font-bold">
-                  0 Quota API
-                </span>
-                {radarScannedAt && !radarScanning && (
-                  <span className="text-[11px] text-slate-400">
-                    · atualizado {formatRelativeTime(radarScannedAt)}
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Varre sozinho velocidade diária, multiplicadores outliers, buscas reais do YouTube Autocomplete, barreira de entrada e RPM estimado.
-              </p>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+            </span>
+            <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-400">
+              Nicho Radar Ao Vivo
+            </span>
+            <span className="text-[11px] text-slate-400 hidden sm:inline">
+              {radarScanning
+                ? 'Escaneando nichos em alta...'
+                : `${autoTrends.length} nichos monitorados automaticamente`}
+            </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Market Switcher */}
-            <div className="inline-flex rounded-xl bg-[#0b0f14] p-1 border border-slate-800">
-              {(
-                [
-                  { id: 'BR', label: '🇧🇷 BR' },
-                  { id: 'US', label: '🇺🇸 US' },
-                  { id: 'FR', label: '🇫🇷 FR' },
-                  { id: 'ES', label: '🇪🇸 ES' },
-                ] as const
-              ).map((mkt) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex rounded-lg bg-[#0b0f14] p-0.5 border border-slate-800">
+              {(['BR', 'US', 'FR', 'ES'] as const).map((mkt) => (
                 <button
-                  key={mkt.id}
+                  key={mkt}
                   type="button"
-                  onClick={() => setRadarMarket(mkt.id)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                    radarMarket === mkt.id
-                      ? 'bg-emerald-500 text-slate-950 shadow'
+                  onClick={() => setRadarMarket(mkt)}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                    radarMarket === mkt
+                      ? 'bg-emerald-500 text-slate-950'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  {mkt.label}
+                  {mkt}
                 </button>
               ))}
             </div>
 
-            {displayedTrends.length > 4 && (
-              <button
-                type="button"
-                onClick={() => setShowAllCards((v) => !v)}
-                className="px-3 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-xs text-slate-200 font-semibold cursor-pointer"
-              >
-                {showAllCards ? 'Compactar (Top 4)' : `Expandir (${displayedTrends.length})`}
-              </button>
-            )}
-
             <button
               type="button"
-              onClick={() => {
-                void runAutonomousScan(radarMarket, true);
-                if (competitors.length > 0) void syncCompetitors();
-              }}
-              disabled={radarScanning || isSyncingCompetitors}
-              title="Reescanear o YouTube ao vivo agora"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition cursor-pointer disabled:opacity-50"
+              onClick={() => setActiveTab('radar')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold shadow-lg shadow-emerald-500/20 transition cursor-pointer"
             >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${
-                  radarScanning ? 'animate-spin text-emerald-400' : ''
-                }`}
-              />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('niche')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-lg shadow-purple-600/20 transition cursor-pointer"
-            >
-              <Compass className="w-3.5 h-3.5" />
-              Suite Completa
+              Ver em Página à Parte
+              <ArrowUpRight className="w-4 h-4" />
             </button>
 
             <button
               type="button"
               onClick={toggleNicheRadar}
-              title="Ocultar Radar"
-              className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+              title="Ocultar barra na página inicial"
+              className="p-1.5 rounded-lg bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white cursor-pointer"
             >
               <EyeOff className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Executive Intelligence Pulse Strip + Mode Filter Pills */}
-        {executiveSummary && (
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1">
-              <div className="rounded-xl bg-[#0b0f14]/90 border border-orange-500/30 px-3 py-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-wider text-orange-400 font-bold flex items-center gap-1">
-                    <Flame className="w-3 h-3" /> #1 Mais Quente Agora
-                  </div>
-                  <div className="text-xs font-bold text-white truncate">
-                    {executiveSummary.hottest.icon} {executiveSummary.hottest.name}
-                  </div>
-                </div>
-                <span className="text-xs font-extrabold font-mono-num text-orange-300 shrink-0">
-                  {executiveSummary.hottest.heatScore}°
-                </span>
-              </div>
-
-              <div className="rounded-xl bg-[#0b0f14]/90 border border-emerald-500/30 px-3 py-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-1">
-                    <Zap className="w-3 h-3" /> Maior Pico Outlier
-                  </div>
-                  <div className="text-xs font-bold text-white truncate">
-                    {executiveSummary.biggestOutlier.icon}{' '}
-                    {executiveSummary.biggestOutlier.topVideo?.title ||
-                      executiveSummary.biggestOutlier.name}
+        {/* Minimal 4-Pill Ticker Row */}
+        {displayedTrends.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+            {displayedTrends.slice(0, 4).map((tItem, idx) => (
+              <button
+                key={tItem.id}
+                type="button"
+                onClick={() => setActiveTab('radar')}
+                className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#0b0f14]/90 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/40 text-left transition cursor-pointer group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[11px] font-mono-num font-bold text-slate-400 shrink-0">
+                    #{idx + 1}
+                  </span>
+                  <span className="text-base shrink-0">{tItem.icon}</span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-white group-hover:text-emerald-300 truncate">
+                      {tItem.name}
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-mono-num truncate">
+                      {formatCompact(tItem.avgViewsPerDay)}/dia · Pico {tItem.maxOutlier}x · $
+                      {tItem.estimatedRpm.toFixed(1)} RPM
+                    </div>
                   </div>
                 </div>
-                <span className="text-xs font-extrabold font-mono-num text-emerald-300 shrink-0">
-                  {executiveSummary.biggestOutlier.maxOutlier}x
+                <span className="shrink-0 px-2 py-1 rounded-lg bg-orange-500/15 border border-orange-500/30 text-orange-300 text-xs font-extrabold font-mono-num">
+                  🔥 {tItem.heatScore}°
                 </span>
-              </div>
-
-              <div className="rounded-xl bg-[#0b0f14]/90 border border-sky-500/30 px-3 py-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-wider text-sky-400 font-bold flex items-center gap-1">
-                    <DollarSign className="w-3 h-3" /> Melhor RPM × Demanda
-                  </div>
-                  <div className="text-xs font-bold text-white truncate">
-                    {executiveSummary.bestMonetization.icon}{' '}
-                    {executiveSummary.bestMonetization.name}
-                  </div>
-                </div>
-                <span className="text-xs font-extrabold font-mono-num text-sky-300 shrink-0">
-                  {formatCurrency(executiveSummary.bestMonetization.estimatedRpm)}
-                </span>
-              </div>
-            </div>
-
-            {/* 4 Radar Lenses */}
-            <div className="inline-flex flex-wrap rounded-xl bg-[#0b0f14] p-1 border border-slate-800 gap-1 shrink-0">
-              {(
-                [
-                  { id: 'all', label: '🔥 Ranking Geral', icon: TrendingUp },
-                  {
-                    id: 'emergent',
-                    label: `🚀 Descobertas (${executiveSummary.emergentCount})`,
-                    icon: Rocket,
-                  },
-                  { id: 'rpm', label: '💎 Maior RPM', icon: DollarSign },
-                  { id: 'low_comp', label: '🎯 Menor Barreira', icon: ShieldCheck },
-                ] as const
-              ).map((tab) => {
-                const Icon = tab.icon;
-                const active = viewMode === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setViewMode(tab.id)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                      active
-                        ? 'bg-orange-500 text-white shadow'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="w-3 h-3" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-12 rounded-xl bg-[#0b0f14]/70 border border-slate-800 animate-pulse"
+              />
+            ))}
           </div>
         )}
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // FULL DEDICATED PAGE MODE (activeTab === 'radar') — Spacious & Large!
+  // =========================================================================
+  return (
+    <>
+      <div className="space-y-6">
+        {/* Top Hero Command Bar */}
+        <div className="rounded-2xl bg-gradient-to-br from-[#0f1922] via-[#121720] to-[#191324] border border-emerald-500/35 p-6 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/25 to-orange-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0">
+                <Radar
+                  className={`w-6 h-6 text-emerald-400 ${
+                    radarScanning ? 'animate-spin' : ''
+                  }`}
+                />
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400" />
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
+                    Ultra Nicho Radar AI
+                  </h2>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 text-xs font-bold">
+                    {radarScanning
+                      ? 'Escaneando YouTube + Autocomplete ao vivo...'
+                      : `Auto-Scan Ativo · ${autoTrends.length} Nichos em Tempo Real`}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold">
+                    0 Quota API
+                  </span>
+                  {radarScannedAt && !radarScanning && (
+                    <span className="text-xs text-slate-400">
+                      · atualizado {formatRelativeTime(radarScannedAt)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-400 mt-1">
+                  Varredura 100% autônoma de velocidade diária, vídeos outliers, buscas reais do YouTube Autocomplete, barreira de entrada e potencial de RPM.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Market Switcher */}
+              <div className="inline-flex rounded-xl bg-[#0b0f14] p-1.5 border border-slate-800 gap-1">
+                {(
+                  [
+                    { id: 'BR', label: '🇧🇷 Brasil' },
+                    { id: 'US', label: '🇺🇸 EUA' },
+                    { id: 'FR', label: '🇫🇷 França' },
+                    { id: 'ES', label: '🇪🇸 Espanha' },
+                  ] as const
+                ).map((mkt) => (
+                  <button
+                    key={mkt.id}
+                    type="button"
+                    onClick={() => setRadarMarket(mkt.id)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      radarMarket === mkt.id
+                        ? 'bg-emerald-500 text-slate-950 shadow'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    {mkt.label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void runAutonomousScan(radarMarket, true);
+                  if (competitors.length > 0) void syncCompetitors();
+                }}
+                disabled={radarScanning || isSyncingCompetitors}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0b0f14] hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${
+                    radarScanning ? 'animate-spin text-emerald-400' : ''
+                  }`}
+                />
+                Atualizar Agora
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('niche')}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-lg shadow-purple-600/20 transition cursor-pointer"
+              >
+                <Compass className="w-4 h-4" />
+                Explorador &amp; Concorrentes
+              </button>
+            </div>
+          </div>
+
+          {/* Executive Intelligence Highlights + 4 Filter Lenses */}
+          {executiveSummary && (
+            <div className="space-y-4 pt-4 border-t border-slate-800/80">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-2xl bg-[#0b0f14]/95 border border-orange-500/35 p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <div className="text-xs uppercase tracking-wider text-orange-400 font-bold flex items-center gap-1.5">
+                      <Flame className="w-4 h-4" /> #1 Nicho Mais Quente Agora
+                    </div>
+                    <div className="text-base font-bold text-white truncate">
+                      {executiveSummary.hottest.icon} {executiveSummary.hottest.name}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {formatCompact(executiveSummary.hottest.avgViewsPerDay)} views/dia em média
+                    </div>
+                  </div>
+                  <span className="text-2xl font-extrabold font-mono-num text-orange-300 shrink-0">
+                    {executiveSummary.hottest.heatScore}°
+                  </span>
+                </div>
+
+                <div className="rounded-2xl bg-[#0b0f14]/95 border border-emerald-500/35 p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <div className="text-xs uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-1.5">
+                      <Zap className="w-4 h-4" /> Maior Explosão Outlier
+                    </div>
+                    <div className="text-base font-bold text-white truncate">
+                      {executiveSummary.biggestOutlier.topVideo?.title ||
+                        executiveSummary.biggestOutlier.name}
+                    </div>
+                    <div className="text-xs text-slate-400 truncate">
+                      {executiveSummary.biggestOutlier.icon}{' '}
+                      {executiveSummary.biggestOutlier.name}
+                    </div>
+                  </div>
+                  <span className="text-2xl font-extrabold font-mono-num text-emerald-300 shrink-0">
+                    {executiveSummary.biggestOutlier.maxOutlier}x
+                  </span>
+                </div>
+
+                <div className="rounded-2xl bg-[#0b0f14]/95 border border-sky-500/35 p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <div className="text-xs uppercase tracking-wider text-sky-400 font-bold flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4" /> Melhor RPM × Demanda
+                    </div>
+                    <div className="text-base font-bold text-white truncate">
+                      {executiveSummary.bestMonetization.icon}{' '}
+                      {executiveSummary.bestMonetization.name}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      Barreira: {executiveSummary.bestMonetization.competitionLevel}
+                    </div>
+                  </div>
+                  <span className="text-2xl font-extrabold font-mono-num text-sky-300 shrink-0">
+                    {formatCurrency(executiveSummary.bestMonetization.estimatedRpm)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex flex-wrap rounded-xl bg-[#0b0f14] p-1.5 border border-slate-800 gap-1.5">
+                  {(
+                    [
+                      { id: 'all', label: '🔥 Ranking Geral em Alta', icon: TrendingUp },
+                      {
+                        id: 'emergent',
+                        label: `🚀 Descobertas Autônomas (${executiveSummary.emergentCount})`,
+                        icon: Rocket,
+                      },
+                      { id: 'rpm', label: '💎 Maior RPM & Receita', icon: DollarSign },
+                      { id: 'low_comp', label: '🎯 Menor Concorrência', icon: ShieldCheck },
+                    ] as const
+                  ).map((tab) => {
+                    const Icon = tab.icon;
+                    const active = viewMode === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setViewMode(tab.id)}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          active
+                            ? 'bg-orange-500 text-white shadow'
+                            : 'text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {nicheSummaries.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-400">Meus Nichos:</span>
+                    {nicheSummaries.map(({ niche, channelsCount, views }) => {
+                      const isSelected = selectedNicheId === niche.id;
+                      return (
+                        <button
+                          key={niche.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedNicheId(isSelected ? 'all' : niche.id);
+                            openNicheExplorerWithQuery(niche.keywords || niche.name);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-[#0b0f14] border border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/15 cursor-pointer"
+                        >
+                          <span>{niche.icon}</span>
+                          <span className="font-bold">{niche.name}</span>
+                          <span className="text-slate-400 font-mono-num">
+                            ({channelsCount} · {formatCompact(views)})
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {radarError && (
-          <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-xs text-amber-300">
+          <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 px-5 py-4 text-sm text-amber-300">
             ⚠️ {radarError}
           </div>
         )}
 
-        {/* Loading Skeletons */}
-        {radarScanning && autoTrends.length === 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => (
+        {/* Spacious Full-Page Cards Grid (2 per row on lg/xl, 3 per row on ultra-wide 2xl) */}
+        {radarScanning && autoTrends.length === 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+            {[0, 1, 2, 3, 4, 5].map((idx) => (
               <div
                 key={idx}
-                className="rounded-2xl bg-[#0b0f14]/90 border border-slate-800 p-4 h-56 animate-pulse flex flex-col justify-between"
+                className="rounded-2xl bg-[#121720] border border-slate-800 p-6 h-80 animate-pulse flex flex-col justify-between"
               >
-                <div className="h-4 w-3/4 bg-slate-800 rounded" />
-                <div className="h-8 w-full bg-slate-800/70 rounded" />
-                <div className="h-14 w-full bg-slate-800/60 rounded" />
-                <div className="h-6 w-full bg-slate-800 rounded" />
+                <div className="h-6 w-2/3 bg-slate-800 rounded" />
+                <div className="h-14 w-full bg-slate-800/70 rounded-xl" />
+                <div className="h-24 w-full bg-slate-800/60 rounded-xl" />
+                <div className="h-10 w-full bg-slate-800 rounded-xl" />
               </div>
             ))}
           </div>
-        )}
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+            {displayedTrends.map((trend, idx) => {
+              const isExploding = trend.heatScore >= 80;
+              const isStrong = trend.heatScore >= 65;
+              const runnerUp = trend.topVideos?.[1] || null;
+              const topVidUrl = trend.topVideo
+                ? trend.topVideo.isShort
+                  ? `https://www.youtube.com/shorts/${trend.topVideo.id}`
+                  : `https://www.youtube.com/watch?v=${trend.topVideo.id}`
+                : null;
+              const runnerUpUrl = runnerUp
+                ? runnerUp.isShort
+                  ? `https://www.youtube.com/shorts/${runnerUp.id}`
+                  : `https://www.youtube.com/watch?v=${runnerUp.id}`
+                : null;
 
-        {/* Ultra Niche Cards Grid (4 per row) */}
-        {displayedTrends.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            {(showAllCards ? displayedTrends : displayedTrends.slice(0, 4)).map(
-              (trend, idx) => {
-                const isExploding = trend.heatScore >= 80;
-                const isStrong = trend.heatScore >= 65;
-                const runnerUp = trend.topVideos?.[1] || null;
-                const topVidUrl = trend.topVideo
-                  ? trend.topVideo.isShort
-                    ? `https://www.youtube.com/shorts/${trend.topVideo.id}`
-                    : `https://www.youtube.com/watch?v=${trend.topVideo.id}`
-                  : null;
-                const runnerUpUrl = runnerUp
-                  ? runnerUp.isShort
-                    ? `https://www.youtube.com/shorts/${runnerUp.id}`
-                    : `https://www.youtube.com/watch?v=${runnerUp.id}`
-                  : null;
+              return (
+                <div
+                  key={trend.id}
+                  className={`rounded-2xl bg-[#121720] border p-6 flex flex-col justify-between gap-5 transition ${
+                    trend.isEmergentDiscovery
+                      ? 'border-purple-500/50 hover:border-purple-400 shadow-xl shadow-purple-950/20'
+                      : idx === 0
+                      ? 'border-orange-500/60 hover:border-orange-400 shadow-xl shadow-orange-950/20'
+                      : isStrong
+                      ? 'border-emerald-500/35 hover:border-emerald-400/70'
+                      : 'border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="space-y-4">
+                    {/* Card Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xs font-mono-num font-extrabold px-2.5 py-1 rounded-lg bg-[#0b0f14] border border-slate-800 text-slate-200 shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <span className="text-2xl shrink-0">{trend.icon}</span>
+                          <h3 className="text-base sm:text-lg font-extrabold text-white leading-snug">
+                            {trend.name}
+                          </h3>
+                        </div>
 
-                return (
-                  <div
-                    key={trend.id}
-                    className={`rounded-2xl bg-[#0b0f14]/95 border p-4 flex flex-col justify-between gap-3 transition ${
-                      trend.isEmergentDiscovery
-                        ? 'border-purple-500/50 hover:border-purple-400 shadow-lg shadow-purple-950/20'
-                        : idx === 0
-                        ? 'border-orange-500/55 hover:border-orange-400 shadow-lg shadow-orange-950/20'
-                        : isStrong
-                        ? 'border-emerald-500/35 hover:border-emerald-400/70'
-                        : 'border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="space-y-2.5">
-                      {/* Title + Heat Score */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-mono-num font-extrabold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">
-                              #{idx + 1}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-emerald-400">
+                            {trend.statusLabel}
+                          </span>
+                          {trend.isEmergentDiscovery && (
+                            <span className="px-2 py-0.5 rounded-md bg-purple-500/20 border border-purple-500/40 text-[11px] font-bold text-purple-300">
+                              🆕 Descoberto no Autocomplete
                             </span>
-                            <span className="text-sm shrink-0">{trend.icon}</span>
-                            <h3 className="text-xs font-bold text-white truncate">
-                              {trend.name}
-                            </h3>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            {trend.isEmergentDiscovery && (
-                              <span className="px-1.5 py-0.5 rounded bg-purple-500/20 border border-purple-500/40 text-[9px] font-extrabold uppercase text-purple-300">
-                                🆕 Descoberto no Autocomplete
-                              </span>
-                            )}
-                            {trend.usArbitrageGap && trend.usArbitrageGap >= 1.5 && (
-                              <span className="px-1.5 py-0.5 rounded bg-sky-500/20 border border-sky-500/40 text-[9px] font-extrabold text-sky-300 flex items-center gap-0.5">
-                                <Globe2 className="w-2.5 h-2.5" /> Gap EUA {trend.usArbitrageGap}x
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <span
-                          className={`shrink-0 px-2 py-0.5 rounded-lg text-[11px] font-extrabold font-mono-num border ${
-                            isExploding
-                              ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
-                              : isStrong
-                              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35'
-                              : 'bg-slate-800 text-slate-200 border-slate-700'
-                          }`}
-                        >
-                          🔥 {trend.heatScore}°
-                        </span>
-                      </div>
-
-                      {/* Heat Progress Bar */}
-                      <div className="h-1.5 w-full rounded-full bg-slate-800/90 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            isExploding
-                              ? 'bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-400'
-                              : 'bg-gradient-to-r from-emerald-500 to-sky-400'
-                          }`}
-                          style={{ width: `${Math.min(100, Math.max(15, trend.heatScore))}%` }}
-                        />
-                      </div>
-
-                      {/* 4 Metrics Box */}
-                      <div className="grid grid-cols-4 gap-1 text-center py-2 px-1 rounded-xl bg-[#121720] border border-slate-800/90">
-                        <div>
-                          <div className="text-[11px] font-bold font-mono-num text-white">
-                            {formatCompact(trend.avgViewsPerDay)}
-                          </div>
-                          <div className="text-[9px] text-slate-500">Views/Dia</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-bold font-mono-num text-emerald-400">
-                            {trend.maxOutlier}x
-                          </div>
-                          <div className="text-[9px] text-slate-500">Outlier</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-bold font-mono-num text-sky-400">
-                            ${trend.estimatedRpm.toFixed(1)}
-                          </div>
-                          <div className="text-[9px] text-slate-500">RPM Est.</div>
-                        </div>
-                        <div>
-                          <div
-                            className={`text-[10px] font-extrabold ${
-                              trend.competitionLevel === 'Baixa'
-                                ? 'text-emerald-400'
-                                : trend.competitionLevel === 'Média'
-                                ? 'text-amber-300'
-                                : 'text-rose-400'
-                            }`}
-                          >
-                            {trend.competitionLevel}
-                          </div>
-                          <div className="text-[9px] text-slate-500">Barreira</div>
-                        </div>
-                      </div>
-
-                      {/* #1 Breakout Video + #2 Runner-Up */}
-                      {trend.topVideo && topVidUrl && (
-                        <div className="space-y-1.5">
-                          <a
-                            href={topVidUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2.5 p-1.5 rounded-xl bg-[#121720]/90 hover:bg-slate-800/90 border border-slate-800/80 transition group"
-                          >
-                            <div className="relative w-18 h-11 rounded-lg overflow-hidden shrink-0 bg-slate-900">
-                              <img
-                                src={trend.topVideo.thumbnailUrl}
-                                alt={trend.topVideo.title}
-                                className="w-full h-full object-cover"
-                              />
-                              <span className="absolute bottom-0.5 right-0.5 px-1 rounded bg-black/85 text-[8px] font-mono-num font-bold text-orange-300">
-                                {trend.topVideo.outlierScore}x
-                              </span>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-[11px] font-semibold text-slate-100 group-hover:text-orange-300 line-clamp-1">
-                                {trend.topVideo.title}
-                              </div>
-                              <div className="text-[10px] text-slate-400 truncate">
-                                {trend.topVideo.channelTitle} ·{' '}
-                                <span className="text-emerald-400 font-mono-num font-semibold">
-                                  {formatCompact(trend.topVideo.viewsPerDay)}/dia
-                                </span>
-                              </div>
-                            </div>
-                          </a>
-
-                          {runnerUp && runnerUpUrl && (
-                            <a
-                              href={runnerUpUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-[#121720]/50 hover:bg-slate-800/60 text-[10px] text-slate-400 hover:text-slate-200 transition"
-                            >
-                              <span className="truncate">
-                                #2 {runnerUp.title}
-                              </span>
-                              <span className="shrink-0 font-mono-num text-sky-400 font-semibold">
-                                {formatCompact(runnerUp.viewsPerDay)}/d
-                              </span>
-                            </a>
+                          )}
+                          {trend.usArbitrageGap && trend.usArbitrageGap >= 1.5 && (
+                            <span className="px-2 py-0.5 rounded-md bg-sky-500/20 border border-sky-500/40 text-[11px] font-bold text-sky-300 inline-flex items-center gap-1">
+                              <Globe2 className="w-3 h-3" /> Gap EUA {trend.usArbitrageGap}x
+                            </span>
                           )}
                         </div>
-                      )}
+                      </div>
 
-                      {/* Live Rising Keywords from YouTube Suggest */}
-                      {trend.risingKeywords && trend.risingKeywords.length > 0 && (
-                        <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                          {trend.risingKeywords.slice(0, 2).map((kw) => (
+                      <span
+                        className={`shrink-0 px-3 py-1.5 rounded-xl text-sm font-extrabold font-mono-num border ${
+                          isExploding
+                            ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+                            : isStrong
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35'
+                            : 'bg-[#0b0f14] text-slate-200 border-slate-700'
+                        }`}
+                      >
+                        🔥 {trend.heatScore}°
+                      </span>
+                    </div>
+
+                    {/* Heat Progress Bar */}
+                    <div className="h-2 w-full rounded-full bg-[#0b0f14] overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          isExploding
+                            ? 'bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-400'
+                            : 'bg-gradient-to-r from-emerald-500 to-sky-400'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(15, trend.heatScore))}%` }}
+                      />
+                    </div>
+
+                    {/* 4 Spacious Metrics */}
+                    <div className="grid grid-cols-4 gap-2 text-center py-3 px-2 rounded-xl bg-[#0b0f14] border border-slate-800/90">
+                      <div>
+                        <div className="text-sm sm:text-base font-extrabold font-mono-num text-white">
+                          {formatCompact(trend.avgViewsPerDay)}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Views/Dia</div>
+                      </div>
+                      <div>
+                        <div className="text-sm sm:text-base font-extrabold font-mono-num text-emerald-400">
+                          {trend.maxOutlier}x
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Pico Outlier</div>
+                      </div>
+                      <div>
+                        <div className="text-sm sm:text-base font-extrabold font-mono-num text-sky-400">
+                          ${trend.estimatedRpm.toFixed(2)}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">RPM Est.</div>
+                      </div>
+                      <div>
+                        <div
+                          className={`text-sm sm:text-base font-extrabold ${
+                            trend.competitionLevel === 'Baixa'
+                              ? 'text-emerald-400'
+                              : trend.competitionLevel === 'Média'
+                              ? 'text-amber-300'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          {trend.competitionLevel}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Barreira</div>
+                      </div>
+                    </div>
+
+                    {/* Breakout Videos (#1 Large + #2 Clear) */}
+                    {trend.topVideo && topVidUrl && (
+                      <div className="space-y-2.5">
+                        <a
+                          href={topVidUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3.5 p-2.5 rounded-xl bg-[#0b0f14] hover:bg-slate-900 border border-slate-800 hover:border-orange-500/40 transition group"
+                        >
+                          <div className="relative w-28 h-16 rounded-lg overflow-hidden shrink-0 bg-slate-900">
+                            <img
+                              src={trend.topVideo.thumbnailUrl}
+                              alt={trend.topVideo.title}
+                              className="w-full h-full object-cover"
+                            />
+                            <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/85 text-[10px] font-mono-num font-extrabold text-orange-300">
+                              🔥 {trend.topVideo.outlierScore}x
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="text-sm font-bold text-white group-hover:text-orange-300 line-clamp-2 leading-snug">
+                              {trend.topVideo.title}
+                            </div>
+                            <div className="text-xs text-slate-400 flex items-center justify-between gap-2">
+                              <span className="truncate">{trend.topVideo.channelTitle}</span>
+                              <span className="shrink-0 text-emerald-400 font-mono-num font-bold">
+                                {formatCompact(trend.topVideo.viewsPerDay)}/dia
+                              </span>
+                            </div>
+                          </div>
+                        </a>
+
+                        {runnerUp && runnerUpUrl && (
+                          <a
+                            href={runnerUpUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-[#0b0f14]/60 hover:bg-[#0b0f14] border border-slate-800/70 text-xs text-slate-300 hover:text-white transition"
+                          >
+                            <span className="truncate font-medium">
+                              <strong className="text-slate-400">#2:</strong> {runnerUp.title}
+                            </span>
+                            <span className="shrink-0 font-mono-num text-sky-400 font-bold flex items-center gap-1">
+                              {formatCompact(runnerUp.viewsPerDay)}/dia
+                              <ExternalLink className="w-3 h-3" />
+                            </span>
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Rising YouTube Autocomplete Searches */}
+                    {trend.risingKeywords && trend.risingKeywords.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                          Buscas subindo hoje no YouTube:
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {trend.risingKeywords.slice(0, 3).map((kw) => (
                             <button
                               key={kw}
                               type="button"
                               onClick={() => openNicheExplorerWithQuery(kw)}
-                              title={`Explorar busca em alta: "${kw}"`}
-                              className="px-2 py-0.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300 hover:text-emerald-300 truncate max-w-full cursor-pointer transition"
+                              className="px-2.5 py-1 rounded-lg bg-[#0b0f14] hover:bg-slate-800 border border-slate-800 text-xs text-slate-200 hover:text-emerald-300 cursor-pointer transition"
                             >
                               🔍 {kw}
                             </button>
                           ))}
                         </div>
-                      )}
-                    </div>
-
-                    {/* Action Footer */}
-                    <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-800/80">
-                      <button
-                        type="button"
-                        onClick={() => void triggerInstantClone(trend)}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600 text-purple-200 hover:text-white border border-purple-500/35 text-[11px] font-bold transition cursor-pointer"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        Clonar 4 Idiomas
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => openNicheExplorerWithQuery(trend.query)}
-                        className="px-2.5 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 text-[11px] font-bold transition cursor-pointer shrink-0"
-                      >
-                        Ver +24 →
-                      </button>
-                    </div>
+                      </div>
+                    )}
                   </div>
-                );
-              }
-            )}
+
+                  {/* Spacious Action Buttons */}
+                  <div className="flex items-center gap-2.5 pt-3 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => void triggerInstantClone(trend)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-purple-600/20 transition cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Clonar em 4 Idiomas (IA)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => openNicheExplorerWithQuery(trend.query)}
+                      className="px-4 py-2.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/35 text-orange-300 text-xs sm:text-sm font-bold transition cursor-pointer shrink-0"
+                    >
+                      Explorar +24 →
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Optional Custom Niches & Monitored Competitors strips */}
-        {(nicheSummaries.length > 0 || topCompetitorOutliers.length > 0) && (
-          <div className="pt-3 border-t border-slate-800/80 space-y-3">
-            {nicheSummaries.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Meus Nichos Salvos:
-                </span>
-                {nicheSummaries.map(({ niche, channelsCount, views }) => {
-                  const isSelected = selectedNicheId === niche.id;
-                  return (
-                    <button
-                      key={niche.id}
-                      type="button"
-                      onClick={() => setSelectedNicheId(isSelected ? 'all' : niche.id)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border transition cursor-pointer ${
-                        isSelected
-                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'
-                          : 'bg-[#0b0f14] border-slate-800 text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      <span>{niche.icon}</span>
-                      <span className="font-semibold">{niche.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono-num">
-                        ({channelsCount} · {formatCompact(views)} views)
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {topCompetitorOutliers.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {topCompetitorOutliers.map(({ channelName, languageId, video }) => {
-                  const lang = languages.find((l) => l.id === languageId);
-                  const ytUrl = video.isShort
-                    ? `https://www.youtube.com/shorts/${video.id}`
-                    : `https://www.youtube.com/watch?v=${video.id}`;
-                  return (
-                    <a
-                      key={`${channelName}-${video.id}`}
-                      href={ytUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-xl bg-[#0b0f14]/90 border border-slate-800 hover:border-orange-500/40 p-2.5 flex items-center gap-2.5 transition group"
-                    >
-                      <img
-                        src={video.thumbnailUrl}
-                        alt={video.title}
-                        className="w-16 h-10 rounded object-cover shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[11px] font-semibold text-white group-hover:text-orange-300 truncate">
-                          {video.title}
-                        </div>
-                        <div className="text-[10px] text-slate-400 truncate">
-                          {lang?.flag} {channelName} ·{' '}
-                          <span className="text-orange-300 font-bold font-mono-num">
-                            🔥 {video.outlierScore}x
-                          </span>
-                        </div>
+        {/* Monitored Competitor Outliers Section (if any) */}
+        {topCompetitorOutliers.length > 0 && (
+          <div className="rounded-2xl bg-[#121720] border border-slate-800 p-6 space-y-4">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-400" />
+              Top Vídeos Outliers dos Seus Concorrentes Monitorados
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {topCompetitorOutliers.map(({ channelName, languageId, video }) => {
+                const lang = languages.find((l) => l.id === languageId);
+                const ytUrl = video.isShort
+                  ? `https://www.youtube.com/shorts/${video.id}`
+                  : `https://www.youtube.com/watch?v=${video.id}`;
+                return (
+                  <a
+                    key={`${channelName}-${video.id}`}
+                    href={ytUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-xl bg-[#0b0f14] border border-slate-800 hover:border-orange-500/40 p-3.5 flex items-center gap-3.5 transition group"
+                  >
+                    <img
+                      src={video.thumbnailUrl}
+                      alt={video.title}
+                      className="w-24 h-14 rounded-lg object-cover shrink-0"
+                    />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="text-xs font-bold text-white group-hover:text-orange-300 line-clamp-2">
+                        {video.title}
                       </div>
-                    </a>
-                  );
-                })}
-              </div>
-            )}
+                      <div className="text-xs text-slate-400 truncate">
+                        {lang?.flag} {channelName} ·{' '}
+                        <span className="text-orange-300 font-bold font-mono-num">
+                          🔥 {video.outlierScore}x
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -835,14 +943,14 @@ Gere um PACOTE DE ATAQUE IMEDIATO enxuto, magnético e pronto para copiar e prod
         createPortal(
           <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-[#0e131a] border border-purple-500/40 rounded-2xl max-w-3xl w-full max-h-[88vh] flex flex-col shadow-2xl">
-              <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <Sparkles className="w-5 h-5 text-purple-400 shrink-0" />
                   <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-white truncate">
+                    <h3 className="text-base font-bold text-white truncate">
                       Clonador Viral em 4 Idiomas — {clonerTarget.icon} {clonerTarget.name}
                     </h3>
-                    <p className="text-[11px] text-slate-400 truncate">
+                    <p className="text-xs text-slate-400 truncate">
                       Score {clonerTarget.heatScore}° · Pico {clonerTarget.maxOutlier}x ·{' '}
                       {clonerModelLabel || 'Gerando plano de ataque...'}
                     </p>
@@ -857,7 +965,7 @@ Gere um PACOTE DE ATAQUE IMEDIATO enxuto, magnético e pronto para copiar e prod
                         setClonerGroupId(e.target.value);
                         void triggerInstantClone(clonerTarget, e.target.value);
                       }}
-                      className="px-2.5 py-1.5 rounded-xl bg-[#121720] border border-slate-700 text-xs text-white"
+                      className="px-3 py-1.5 rounded-xl bg-[#121720] border border-slate-700 text-xs text-white"
                     >
                       <option value="all">Todos os Grupos</option>
                       {groups.map((g) => (
@@ -877,15 +985,15 @@ Gere um PACOTE DE ATAQUE IMEDIATO enxuto, magnético e pronto para copiar e prod
                       setTimeout(() => setCopied(false), 2000);
                     }}
                     disabled={!clonerResult}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
                   >
                     {copied ? (
                       <>
-                        <Check className="w-3.5 h-3.5" /> Copiado!
+                        <Check className="w-4 h-4" /> Copiado!
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3.5 h-3.5" /> Copiar Tudo
+                        <Copy className="w-4 h-4" /> Copiar Tudo
                       </>
                     )}
                   </button>
@@ -893,23 +1001,23 @@ Gere um PACOTE DE ATAQUE IMEDIATO enxuto, magnético e pronto para copiar e prod
                   <button
                     type="button"
                     onClick={() => setClonerTarget(null)}
-                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                    className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              <div className="p-5 overflow-y-auto flex-1">
+              <div className="p-6 overflow-y-auto flex-1">
                 {clonerLoading ? (
-                  <div className="py-12 text-center space-y-3">
+                  <div className="py-14 text-center space-y-3">
                     <Sparkles className="w-8 h-8 text-purple-400 animate-spin mx-auto" />
-                    <p className="text-xs text-slate-300 font-medium">
+                    <p className="text-sm text-slate-300 font-medium">
                       Fazendo engenharia reversa dos vídeos outliers e adaptando títulos, thumbnails e ganchos para PT-BR, EN, FR e ES...
                     </p>
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed bg-[#0b0f14] border border-slate-800 rounded-xl p-4">
+                  <div className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed bg-[#0b0f14] border border-slate-800 rounded-xl p-5">
                     {clonerResult}
                   </div>
                 )}

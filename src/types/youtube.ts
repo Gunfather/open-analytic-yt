@@ -2,6 +2,7 @@ export type PeriodOption = '24h' | '48h' | '7d' | '14d' | '30d' | '90d';
 
 export type NavTab =
   | 'dashboard'
+  | 'radar'
   | 'channels'
   | 'videos'
   | 'analytics'
