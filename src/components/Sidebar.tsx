@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   CalendarClock,
+  Compass,
   Globe2,
   LayoutDashboard,
   PlaySquare,
@@ -17,12 +18,13 @@ const NAV_ITEMS: Array<{ id: NavTab; label: string; icon: typeof LayoutDashboard
   { id: 'channels', label: 'Gerenciar Canais', icon: Tv2 },
   { id: 'videos', label: 'Vídeos', icon: PlaySquare },
   { id: 'analytics', label: 'Analytics de Vídeo', icon: BarChart3 },
+  { id: 'niche', label: 'Análise de Nicho', icon: Compass },
   { id: 'scheduled', label: 'Tarefas Agendadas', icon: CalendarClock },
   { id: 'settings', label: 'Configurações & API', icon: Settings },
 ];
 
 export function Sidebar() {
-  const { activeTab, setActiveTab, channels, languages, apiKey, t } = useStore();
+  const { activeTab, setActiveTab, channels, competitors, languages, apiKey, t } = useStore();
   const activeChannelsCount = channels.filter((c) => c.isActive).length;
 
   const navLabels: Record<NavTab, string> = {
@@ -30,6 +32,7 @@ export function Sidebar() {
     channels: t('navChannels'),
     videos: t('navVideos'),
     analytics: t('navAnalytics'),
+    niche: t('navNiche'),
     scheduled: t('navScheduled'),
     settings: t('navSettings'),
   };
@@ -46,7 +49,7 @@ export function Sidebar() {
             <div className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5">
               Open Analytic YT
               <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/30">
-                PRO
+                v2.0
               </span>
             </div>
             <p className="text-[11px] text-slate-400">Multi-Channel Monitor</p>
@@ -81,6 +84,17 @@ export function Sidebar() {
                     }`}
                   >
                     {activeChannelsCount}/{channels.length}
+                  </span>
+                )}
+                {item.id === 'niche' && (
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-purple-500/20 text-purple-300'
+                    }`}
+                  >
+                    {competitors.length > 0 ? `${competitors.length} radar` : 'NEW'}
                   </span>
                 )}
               </button>

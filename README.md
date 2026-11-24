@@ -1,17 +1,24 @@
-# Open Analytic YT
+# Open Analytic YT v2.0
 
 [![License: CC0-1.0](https://img.shields.io/badge/License-CC0%201.0-lightgrey.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-orange.svg)](https://github.com/Gunfather/open-analytic-yt/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0-orange.svg)](https://github.com/Gunfather/open-analytic-yt/releases)
 [![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6.svg)](https://www.typescriptlang.org/)
 
-Open-source multi-channel, multi-language YouTube analytics dashboard inspired by stock/crypto tickers and YouTube Studio.
+Open-source multi-channel, multi-language YouTube analytics & niche intelligence suite inspired by stock/crypto tickers and YouTube Studio.
 
 ![Open Analytic YT Preview](./docs/preview.svg)
 
-> **Privacy & Local-First:** Starts completely empty with **no pre-configured channels, groups, logins, or API keys**. All your channels, groups, API keys, SMTP settings, and scheduled tasks are stored locally in your browser (`localStorage`).
+> **Privacy & Local-First:** Starts completely empty with **no pre-configured channels, groups, logins, or API keys**. All your channels, competitors, groups, API keys, SMTP settings, and scheduled tasks are stored locally in your browser (`localStorage`).
 
 ---
+
+## What's New in v2.0
+
+- **Niche Intelligence & Outlier Explorer** — Search any keyword/subniche across **BR, US, FR, and ES**, calculate a composite **Opportunity Score (0–100)**, detect breakout **Outlier Videos (`2x–50x` above channel average)**, and run **4-Language Arbitrage** comparisons in one click (works via YouTube Data API v3 or zero-quota local public search with 6-hour smart caching).
+- **Isolated Competitor Radar** — Benchmark rival `@handles` and track their breakout outlier videos without mixing competitor numbers into your own channels' revenue or dashboard KPIs.
+- **AI Reverse Engineering & Multi-Language Content Lab** — Turn top niche/competitor outliers into ready-to-produce video briefs adapted culturally for **PT-BR, EN, FR, and ES** (Titles + Thumbnail Concepts + 15s Hooks), supporting **Gemini, OpenAI, DeepSeek, Groq, OpenRouter, and NVIDIA NIM** (plus offline local diagnostics).
+- **Configurable Auto-Sync (`2m`, `10m`, `20m`, `Off`)** — Flexible background sync selector with live `API` / `RSS` source indicator.
 
 ## Features
 

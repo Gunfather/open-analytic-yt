@@ -5,6 +5,7 @@ import { DashboardView } from './components/DashboardView';
 import { ChannelsView } from './components/ChannelsView';
 import { VideosView } from './components/VideosView';
 import { AnalyticsView } from './components/AnalyticsView';
+import { NicheAnalysisView } from './components/NicheAnalysisView';
 import { ScheduledTasksView } from './components/ScheduledTasksView';
 import { SettingsView } from './components/SettingsView';
 
@@ -21,6 +22,7 @@ function AppShell() {
           {activeTab === 'channels' && <ChannelsView />}
           {activeTab === 'videos' && <VideosView />}
           {activeTab === 'analytics' && <AnalyticsView />}
+          {activeTab === 'niche' && <NicheAnalysisView />}
           {activeTab === 'scheduled' && <ScheduledTasksView />}
           {activeTab === 'settings' && <SettingsView />}
         </main>

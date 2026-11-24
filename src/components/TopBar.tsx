@@ -40,6 +40,7 @@ export function TopBar() {
     channels: t('tabChannels'),
     videos: t('tabVideos'),
     analytics: t('tabAnalytics'),
+    niche: t('tabNiche'),
     scheduled: t('tabScheduled'),
     settings: t('tabSettings'),
   };

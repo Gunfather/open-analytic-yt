@@ -4,6 +4,7 @@ import {
   Channel,
   ChannelGroup,
   ChartViewMode,
+  CompetitorChannel,
   DailyMetric,
   KpiMetricKey,
   Language,
@@ -22,6 +23,7 @@ import {
   INITIAL_LANGUAGES,
 } from '../data/seedData';
 import {
+  fetchCompetitorChannelSnapshot,
   fetchPublicChannelWithoutKey,
   fetchRecentVideosForChannel,
   fetchYouTubeChannelData,
@@ -44,6 +46,7 @@ interface PersistedState {
   };
   scheduledTasks?: ScheduledTask[];
   smtpConfig?: SmtpConfig;
+  competitors?: CompetitorChannel[];
 }
 
 interface StoreContextValue {
@@ -120,6 +123,15 @@ interface StoreContextValue {
   exportBackupJson: () => string;
   importBackupJson: (jsonText: string) => { ok: boolean; message: string };
   resetDemoData: () => void;
+  competitors: CompetitorChannel[];
+  isSyncingCompetitors: boolean;
+  addCompetitor: (input: {
+    handle: string;
+    nicheTag: string;
+    languageId: string;
+  }) => Promise<void>;
+  removeCompetitor: (id: string) => void;
+  syncCompetitors: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -227,6 +239,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('combined');
   const [selectedKpi, setSelectedKpi] = useState<KpiMetricKey>('views');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingCompetitors, setIsSyncingCompetitors] = useState(false);
   const [lastSyncMessage, setLastSyncMessage] = useState<string | null>(null);
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>(() => {
     try {
@@ -1034,10 +1047,83 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
+  const addCompetitor: StoreContextValue['addCompetitor'] = async ({
+    handle,
+    nicheTag,
+    languageId,
+  }) => {
+    const cleanTarget = handle.trim();
+    if (!cleanTarget) return;
+    const norm = cleanTarget.toLowerCase().replace(/^@/, '');
+    const existing = (state.competitors || []).find(
+      (c) =>
+        c.handle.toLowerCase().replace(/^@/, '') === norm ||
+        (c.youtubeChannelId && c.youtubeChannelId === cleanTarget)
+    );
+
+    const snapshot = await fetchCompetitorChannelSnapshot({
+      apiKey: state.apiKey,
+      target: cleanTarget,
+      nicheTag,
+      languageId,
+      existingId: existing?.id,
+    });
+
+    setState((prev) => {
+      const list = prev.competitors || [];
+      const filtered = list.filter(
+        (c) =>
+          c.id !== snapshot.id &&
+          c.handle.toLowerCase().replace(/^@/, '') !==
+            snapshot.handle.toLowerCase().replace(/^@/, '') &&
+          (!snapshot.youtubeChannelId || c.youtubeChannelId !== snapshot.youtubeChannelId)
+      );
+      return {
+        ...prev,
+        competitors: [snapshot, ...filtered],
+      };
+    });
+    setLastSyncMessage(`Concorrente "${snapshot.name}" sincronizado no Radar!`);
+  };
+
+  const removeCompetitor = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      competitors: (prev.competitors || []).filter((c) => c.id !== id),
+    }));
+  };
+
+  const syncCompetitors = async () => {
+    const list = state.competitors || [];
+    if (list.length === 0) return;
+    setIsSyncingCompetitors(true);
+    try {
+      const updated: CompetitorChannel[] = [];
+      for (const comp of list) {
+        try {
+          const snap = await fetchCompetitorChannelSnapshot({
+            apiKey: state.apiKey,
+            target: comp.youtubeChannelId || comp.handle,
+            nicheTag: comp.nicheTag,
+            languageId: comp.languageId,
+            existingId: comp.id,
+          });
+          updated.push(snap);
+        } catch {
+          updated.push(comp);
+        }
+      }
+      setState((prev) => ({ ...prev, competitors: updated }));
+      setLastSyncMessage(`Radar atualizado: ${updated.length} concorrente(s) analisado(s).`);
+    } finally {
+      setIsSyncingCompetitors(false);
+    }
+  };
+
   const exportBackupJson = () => {
     return JSON.stringify(
       {
-        version: '1.1.0',
+        version: '2.0.0',
         exportedAt: new Date().toISOString(),
         languages: state.languages,
         groups: state.groups || [],
@@ -1045,6 +1131,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         metrics: state.metrics,
         videos: state.videos,
         scheduledTasks: state.scheduledTasks || [],
+        competitors: state.competitors || [],
       },
       null,
       2
@@ -1067,6 +1154,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         scheduledTasks: Array.isArray(parsed.scheduledTasks)
           ? parsed.scheduledTasks
           : [],
+        competitors: Array.isArray(parsed.competitors)
+          ? parsed.competitors
+          : prev.competitors || [],
       }));
       setSelectedLanguageId('all');
       setSelectedGroupId('all');
@@ -1152,6 +1242,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         exportBackupJson,
         importBackupJson,
         resetDemoData,
+        competitors: state.competitors || [],
+        isSyncingCompetitors,
+        addCompetitor,
+        removeCompetitor,
+        syncCompetitors,
       }}
     >
       {children}

@@ -1,4 +1,10 @@
-import { Channel, VideoItem } from '../types/youtube';
+import {
+  Channel,
+  CompetitorChannel,
+  CompetitorVideo,
+  NicheVideoItem,
+  VideoItem,
+} from '../types/youtube';
 
 interface YTChannelResponse {
   items?: Array<{
@@ -293,4 +299,397 @@ export function parseYouTubeStudioCsv(
   }
 
   return results;
+}
+
+const NICHE_CACHE_KEY = 'open_analytic_niche_cache_v2';
+const NICHE_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+interface NicheCacheEntry {
+  savedAt: number;
+  source: 'api' | 'public';
+  items: NicheVideoItem[];
+}
+
+function readNicheCache(cacheId: string): NicheCacheEntry | null {
+  try {
+    const raw = localStorage.getItem(NICHE_CACHE_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw) as Record<string, NicheCacheEntry>;
+    const entry = map[cacheId];
+    if (!entry) return null;
+    if (Date.now() - entry.savedAt > NICHE_CACHE_TTL_MS) return null;
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function writeNicheCache(cacheId: string, entry: NicheCacheEntry) {
+  try {
+    const raw = localStorage.getItem(NICHE_CACHE_KEY);
+    const map: Record<string, NicheCacheEntry> = raw ? JSON.parse(raw) : {};
+    const keys = Object.keys(map);
+    if (keys.length > 25) {
+      const oldest = keys.sort((a, b) => (map[a]?.savedAt || 0) - (map[b]?.savedAt || 0))[0];
+      if (oldest) delete map[oldest];
+    }
+    map[cacheId] = entry;
+    localStorage.setItem(NICHE_CACHE_KEY, JSON.stringify(map));
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
+export async function searchNicheVideos(params: {
+  query: string;
+  regionCode: string;
+  relevanceLanguage: string;
+  publishedAfterDays: number; // 0 = any time
+  apiKey?: string;
+  forceRefresh?: boolean;
+}): Promise<{ items: NicheVideoItem[]; source: 'api' | 'public'; fromCache: boolean }> {
+  const cleanQuery = params.query.trim();
+  if (!cleanQuery) return { items: [], source: 'public', fromCache: false };
+
+  const modeKey = params.apiKey ? 'api' : 'pub';
+  const cacheId = `${cleanQuery.toLowerCase()}::${params.regionCode}::${params.publishedAfterDays}::${modeKey}`;
+
+  if (!params.forceRefresh) {
+    const cached = readNicheCache(cacheId);
+    if (cached && cached.items.length > 0) {
+      return { items: cached.items, source: cached.source, fromCache: true };
+    }
+  }
+
+  // 1) Official YouTube Data API v3 when key is configured
+  if (params.apiKey) {
+    try {
+      const publishedAfterParam =
+        params.publishedAfterDays > 0
+          ? `&publishedAfter=${encodeURIComponent(
+              new Date(Date.now() - params.publishedAfterDays * 86400000).toISOString()
+            )}`
+          : '';
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=24&order=viewCount&regionCode=${encodeURIComponent(
+        params.regionCode
+      )}&relevanceLanguage=${encodeURIComponent(
+        params.relevanceLanguage
+      )}${publishedAfterParam}&q=${encodeURIComponent(cleanQuery)}&key=${encodeURIComponent(
+        params.apiKey
+      )}`;
+
+      const sRes = await fetch(searchUrl);
+      if (sRes.ok) {
+        const sData = (await sRes.json()) as {
+          items?: Array<{ id?: { videoId?: string }; snippet?: { channelId?: string } }>;
+        };
+        const videoIds = Array.from(
+          new Set((sData.items || []).map((i) => i.id?.videoId || '').filter(Boolean))
+        );
+
+        if (videoIds.length > 0) {
+          const vUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoIds.join(
+            ','
+          )}&key=${encodeURIComponent(params.apiKey)}`;
+          const vRes = await fetch(vUrl);
+          const vData = vRes.ok
+            ? ((await vRes.json()) as {
+                items?: Array<{
+                  id: string;
+                  snippet: {
+                    title: string;
+                    channelId: string;
+                    channelTitle: string;
+                    publishedAt: string;
+                    thumbnails?: { medium?: { url: string }; high?: { url: string } };
+                  };
+                  statistics: {
+                    viewCount?: string;
+                    likeCount?: string;
+                    commentCount?: string;
+                  };
+                  contentDetails: { duration: string };
+                }>;
+              })
+            : { items: [] };
+
+          const uniqueChannelIds = Array.from(
+            new Set((vData.items || []).map((v) => v.snippet.channelId).filter(Boolean))
+          );
+
+          const chStatsMap = new Map<
+            string,
+            { subs: number; avgViews: number; handle?: string }
+          >();
+
+          if (uniqueChannelIds.length > 0) {
+            const cUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${uniqueChannelIds.join(
+              ','
+            )}&key=${encodeURIComponent(params.apiKey)}`;
+            const cRes = await fetch(cUrl);
+            if (cRes.ok) {
+              const cData = (await cRes.json()) as YTChannelResponse;
+              for (const c of cData.items || []) {
+                const subs = Number(c.statistics.subscriberCount || 0);
+                const totalViews = Number(c.statistics.viewCount || 0);
+                const totalVids = Math.max(1, Number(c.statistics.videoCount || 1));
+                const avgViews =
+                  totalViews > 0 ? Math.round(totalViews / totalVids) : Math.max(subs, 250);
+                chStatsMap.set(c.id, {
+                  subs,
+                  avgViews,
+                  handle: c.snippet.customUrl,
+                });
+              }
+            }
+          }
+
+          const nowMs = Date.now();
+          const items: NicheVideoItem[] = (vData.items || []).map((v) => {
+            const views = Number(v.statistics.viewCount || 0);
+            const likes = Number(v.statistics.likeCount || 0);
+            const comments = Number(v.statistics.commentCount || 0);
+            const durationSec = parseIsoDuration(v.contentDetails.duration);
+            const isShort = durationSec <= 65;
+            const pubIso = v.snippet.publishedAt || new Date().toISOString();
+            const daysAgo = Math.max(
+              1,
+              Math.round((nowMs - new Date(pubIso).getTime()) / 86400000)
+            );
+            const chInfo = chStatsMap.get(v.snippet.channelId);
+            const channelSubs = chInfo?.subs ?? 0;
+            const baseline = Math.max(chInfo?.avgViews || channelSubs || 500, 150);
+            const outlierScore = Number((views / baseline).toFixed(2));
+            const engagementRate =
+              views > 0 ? Number((((likes + comments) / views) * 100).toFixed(2)) : 0;
+
+            return {
+              id: v.id,
+              title: v.snippet.title,
+              channelId: v.snippet.channelId,
+              channelTitle: v.snippet.channelTitle,
+              channelHandle: chInfo?.handle,
+              channelSubs,
+              publishedAt: pubIso.slice(0, 10),
+              daysAgo,
+              thumbnailUrl:
+                v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url || '',
+              durationSec,
+              isShort,
+              views,
+              likes,
+              comments,
+              viewsPerDay: Math.round(views / daysAgo),
+              outlierScore,
+              engagementRate,
+            };
+          });
+
+          writeNicheCache(cacheId, { savedAt: Date.now(), source: 'api', items });
+          return { items, source: 'api', fromCache: false };
+        }
+      }
+    } catch {
+      // Fallback to public search below if API quota exceeded or fails
+    }
+  }
+
+  // 2) Public zero-quota fallback via local Vite proxy (/api/yt-search)
+  const pubRes = await fetch(
+    `/api/yt-search?q=${encodeURIComponent(cleanQuery)}&gl=${encodeURIComponent(
+      params.regionCode
+    )}&hl=${encodeURIComponent(params.relevanceLanguage)}`
+  );
+  if (!pubRes.ok) {
+    const errBody = await pubRes.json().catch(() => ({}));
+    throw new Error(errBody.error || `Falha na busca pública (${pubRes.status})`);
+  }
+
+  const pubData = (await pubRes.json()) as {
+    items?: Array<{
+      id: string;
+      title: string;
+      channelId: string;
+      channelTitle: string;
+      channelHandle?: string;
+      publishedAt: string;
+      daysAgo: number;
+      thumbnailUrl: string;
+      durationSec: number;
+      isShort: boolean;
+      views: number;
+    }>;
+  };
+
+  const rawItems = (pubData.items || []).filter((v) =>
+    params.publishedAfterDays > 0 ? v.daysAgo <= params.publishedAfterDays : true
+  );
+
+  // Use sample median views as baseline when channel subscriber stats are unavailable publicly
+  const sortedViews = [...rawItems.map((i) => i.views)].sort((a, b) => a - b);
+  const medianSampleViews = Math.max(
+    sortedViews[Math.floor(sortedViews.length / 2)] || 2500,
+    300
+  );
+
+  const items: NicheVideoItem[] = rawItems.map((v) => {
+    const likes = Math.round(v.views * 0.038);
+    const comments = Math.round(v.views * 0.004);
+    const daysAgo = Math.max(1, v.daysAgo || 7);
+    const outlierScore = Number((v.views / medianSampleViews).toFixed(2));
+    const engagementRate =
+      v.views > 0 ? Number((((likes + comments) / v.views) * 100).toFixed(2)) : 0;
+
+    return {
+      id: v.id,
+      title: v.title,
+      channelId: v.channelId,
+      channelTitle: v.channelTitle,
+      channelHandle: v.channelHandle,
+      channelSubs: 0,
+      publishedAt: v.publishedAt,
+      daysAgo,
+      thumbnailUrl: v.thumbnailUrl,
+      durationSec: v.durationSec,
+      isShort: v.isShort,
+      views: v.views,
+      likes,
+      comments,
+      viewsPerDay: Math.round(v.views / daysAgo),
+      outlierScore,
+      engagementRate,
+    };
+  });
+
+  writeNicheCache(cacheId, { savedAt: Date.now(), source: 'public', items });
+  return { items, source: 'public', fromCache: false };
+}
+
+export async function fetchCompetitorChannelSnapshot(params: {
+  apiKey?: string;
+  target: string;
+  nicheTag: string;
+  languageId: string;
+  existingId?: string;
+}): Promise<CompetitorChannel> {
+  const id = params.existingId || `comp-${Date.now()}`;
+  const nowIso = new Date().toISOString();
+  const nowMs = Date.now();
+
+  if (params.apiKey) {
+    const live = await fetchYouTubeChannelData(params.apiKey, params.target);
+    let rawVideos: VideoItem[] = [];
+    if (live.uploadsPlaylistId) {
+      const dummyCh: Channel = {
+        id,
+        handle: live.handle,
+        name: live.name,
+        languageId: params.languageId,
+        avatarUrl: live.avatarUrl,
+        color: '#f97316',
+        isActive: true,
+        subscribersTotal: live.subscribersTotal,
+        viewsTotal: live.viewsTotal,
+        videosTotal: live.videosTotal,
+        rpm: 2.5,
+        cpm: 4.5,
+        hookRate: 60,
+        engagedRate: 52,
+        lastSyncedAt: nowIso,
+      };
+      rawVideos = await fetchRecentVideosForChannel(
+        params.apiKey,
+        dummyCh,
+        live.uploadsPlaylistId,
+        20
+      );
+    }
+
+    const avgViewsRecent =
+      rawVideos.length > 0
+        ? Math.round(rawVideos.reduce((s, v) => s + v.views, 0) / rawVideos.length)
+        : live.videosTotal > 0
+        ? Math.round(live.viewsTotal / live.videosTotal)
+        : 0;
+    const baseline = Math.max(avgViewsRecent, 100);
+
+    const videos: CompetitorVideo[] = rawVideos.map((v) => {
+      const daysAgo = Math.max(
+        1,
+        Math.round((nowMs - new Date(v.publishedAt).getTime()) / 86400000)
+      );
+      return {
+        id: v.id,
+        title: v.title,
+        publishedAt: v.publishedAt,
+        thumbnailUrl: v.thumbnailUrl,
+        durationSec: v.durationSec,
+        isShort: v.isShort,
+        views: v.views,
+        likes: v.likes,
+        comments: v.comments,
+        outlierScore: Number((v.views / baseline).toFixed(2)),
+        viewsPerDay: Math.round(v.views / daysAgo),
+      };
+    });
+
+    return {
+      id,
+      youtubeChannelId: live.youtubeChannelId,
+      handle: live.handle.startsWith('@') ? live.handle : `@${live.handle}`,
+      name: live.name,
+      nicheTag: params.nicheTag.trim() || 'Geral',
+      languageId: params.languageId,
+      avatarUrl: live.avatarUrl,
+      subscribersTotal: live.subscribersTotal,
+      viewsTotal: live.viewsTotal,
+      videosTotal: live.videosTotal,
+      avgViewsRecent,
+      videos,
+      lastSyncedAt: nowIso,
+    };
+  }
+
+  const pub = await fetchPublicChannelWithoutKey(params.target);
+  const avgViewsRecent =
+    pub.videos.length > 0
+      ? Math.round(pub.videos.reduce((s, v) => s + v.views, 0) / pub.videos.length)
+      : 0;
+  const baseline = Math.max(avgViewsRecent, 100);
+
+  const videos: CompetitorVideo[] = pub.videos.map((v) => {
+    const daysAgo = Math.max(
+      1,
+      Math.round((nowMs - new Date(v.publishedAt).getTime()) / 86400000)
+    );
+    return {
+      id: v.id,
+      title: v.title,
+      publishedAt: v.publishedAt,
+      thumbnailUrl: v.thumbnailUrl,
+      durationSec: v.durationSec,
+      isShort: v.isShort,
+      views: v.views,
+      likes: v.likes,
+      comments: v.comments,
+      outlierScore: Number((v.views / baseline).toFixed(2)),
+      viewsPerDay: Math.round(v.views / daysAgo),
+    };
+  });
+
+  return {
+    id,
+    youtubeChannelId: pub.youtubeChannelId,
+    handle: pub.handle.startsWith('@') ? pub.handle : `@${pub.handle}`,
+    name: pub.name,
+    nicheTag: params.nicheTag.trim() || 'Geral',
+    languageId: params.languageId,
+    avatarUrl: pub.avatarUrl,
+    subscribersTotal: pub.subscribersTotal,
+    viewsTotal: pub.videos.reduce((s, v) => s + v.views, 0),
+    videosTotal: pub.videos.length,
+    avgViewsRecent,
+    videos,
+    lastSyncedAt: nowIso,
+  };
 }

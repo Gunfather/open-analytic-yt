@@ -137,6 +137,172 @@ function youtubePublicProxyPlugin(): Plugin {
         }
       });
 
+      server.middlewares.use('/api/yt-search', async (req, res) => {
+        try {
+          const urlObj = new URL(req.url || '', 'http://localhost');
+          const q = (urlObj.searchParams.get('q') || '').trim();
+          const gl = (urlObj.searchParams.get('gl') || 'US').trim();
+          const hl = (urlObj.searchParams.get('hl') || 'en').trim();
+
+          if (!q) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Parâmetro q obrigatório.' }));
+            return;
+          }
+
+          const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
+            q
+          )}&gl=${encodeURIComponent(gl)}&hl=${encodeURIComponent(hl)}`;
+
+          const pageRes = await fetch(ytSearchUrl, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Accept-Language': `${hl},en-US;q=0.8,en;q=0.7`,
+            },
+          });
+
+          if (!pageRes.ok) {
+            res.statusCode = pageRes.status;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: `YouTube search HTTP ${pageRes.status}` }));
+            return;
+          }
+
+          const html = await pageRes.text();
+          const marker = 'var ytInitialData = ';
+          const startIdx = html.indexOf(marker);
+          if (startIdx === -1) {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ items: [] }));
+            return;
+          }
+
+          const afterMarker = html.slice(startIdx + marker.length);
+          const endIdx = afterMarker.indexOf(';</script>');
+          const jsonStr = endIdx !== -1 ? afterMarker.slice(0, endIdx) : '';
+          const initialData = JSON.parse(jsonStr);
+
+          const renderers: Array<Record<string, unknown>> = [];
+          const collectVideoRenderers = (node: unknown) => {
+            if (!node || typeof node !== 'object') return;
+            if (Array.isArray(node)) {
+              for (const item of node) collectVideoRenderers(item);
+              return;
+            }
+            const obj = node as Record<string, unknown>;
+            if (obj.videoRenderer && typeof obj.videoRenderer === 'object') {
+              renderers.push(obj.videoRenderer as Record<string, unknown>);
+              return;
+            }
+            for (const val of Object.values(obj)) {
+              if (renderers.length < 28) collectVideoRenderers(val);
+            }
+          };
+          collectVideoRenderers(initialData);
+
+          const parseCompactViews = (raw: string): number => {
+            if (!raw) return 0;
+            const lower = raw.toLowerCase();
+            if (lower.includes('no view') || lower.includes('nenhuma') || lower.includes('aucune')) {
+              return 0;
+            }
+            const clean = lower.replace(/\s+/g, ' ');
+            let mult = 1;
+            if (/\bmi|\bm\b|million|milh/i.test(clean)) mult = 1_000_000;
+            else if (/\bk\b|\bmil\b/i.test(clean)) mult = 1_000;
+
+            if (mult > 1) {
+              const numMatch = clean.match(/(\d+(?:[.,]\d+)?)/);
+              if (!numMatch) return 0;
+              const normalized = numMatch[1].replace(',', '.');
+              return Math.round(parseFloat(normalized) * mult);
+            }
+            const digits = clean.replace(/[^\d]/g, '');
+            return digits ? parseInt(digits, 10) : 0;
+          };
+
+          const parseDurationText = (raw: string): number => {
+            if (!raw) return 180;
+            const parts = raw.split(':').map((p) => parseInt(p.trim(), 10) || 0);
+            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            if (parts.length === 2) return parts[0] * 60 + parts[1];
+            return parts[0] || 60;
+          };
+
+          const parseDaysAgo = (raw: string): number => {
+            const s = (raw || '').toLowerCase();
+            const n = parseInt(s.match(/(\d+)/)?.[1] || '1', 10);
+            if (/hour|hora|heure|min/i.test(s)) return 1;
+            if (/day|dia|jour|d\u00eda/i.test(s)) return Math.max(1, n);
+            if (/week|semana|semaine/i.test(s)) return n * 7;
+            if (/month|m\u00eas|mes|mois/i.test(s)) return n * 30;
+            if (/year|ano|an|a\u00f1o/i.test(s)) return n * 365;
+            return 14;
+          };
+
+          const items = renderers.slice(0, 24).map((vr: any) => {
+            const videoId = String(vr.videoId || '');
+            const title =
+              vr.title?.runs?.map((r: any) => r.text).join('') ||
+              vr.title?.simpleText ||
+              'Sem título';
+            const channelRun = vr.ownerText?.runs?.[0] || vr.longBylineText?.runs?.[0];
+            const channelTitle = channelRun?.text || 'Canal';
+            const browseId =
+              channelRun?.navigationEndpoint?.browseEndpoint?.browseId || '';
+            const canonicalUrl =
+              channelRun?.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl || '';
+            const channelHandle = canonicalUrl.startsWith('/@')
+              ? canonicalUrl.slice(1)
+              : undefined;
+            const viewText =
+              vr.viewCountText?.simpleText ||
+              vr.viewCountText?.runs?.map((r: any) => r.text).join('') ||
+              '0';
+            const views = parseCompactViews(viewText);
+            const lengthText = vr.lengthText?.simpleText || '';
+            const isShortOverlay = JSON.stringify(vr.thumbnailOverlays || []).includes('SHORTS');
+            const durationSec = isShortOverlay && !lengthText ? 45 : parseDurationText(lengthText);
+            const pubText = vr.publishedTimeText?.simpleText || '';
+            const daysAgo = parseDaysAgo(pubText);
+            const pubDate = new Date(Date.now() - daysAgo * 86400000)
+              .toISOString()
+              .slice(0, 10);
+            const thumbs = vr.thumbnail?.thumbnails || [];
+            const thumbnailUrl =
+              thumbs[thumbs.length - 1]?.url ||
+              `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+
+            return {
+              id: videoId,
+              title,
+              channelId: browseId,
+              channelTitle,
+              channelHandle,
+              publishedAt: pubDate,
+              daysAgo,
+              thumbnailUrl,
+              durationSec,
+              isShort: isShortOverlay || durationSec <= 65,
+              views,
+            };
+          }).filter((item) => Boolean(item.id));
+
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ items }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              error: err instanceof Error ? err.message : 'Erro na pesquisa pública do YouTube',
+            })
+          );
+        }
+      });
+
       server.middlewares.use('/api/send-email', async (req, res) => {
         if (req.method !== 'POST') {
           res.statusCode = 405;

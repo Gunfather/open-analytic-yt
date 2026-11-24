@@ -5,6 +5,7 @@ export type NavTab =
   | 'channels'
   | 'videos'
   | 'analytics'
+  | 'niche'
   | 'scheduled'
   | 'settings';
 
@@ -195,4 +196,54 @@ export interface AggregatedKpis {
   revenueDeltaPct: number;
   avgCpm: number;
   avgRpm: number;
+}
+
+export interface NicheVideoItem {
+  id: string;
+  title: string;
+  channelId: string;
+  channelTitle: string;
+  channelHandle?: string;
+  channelSubs: number;
+  publishedAt: string; // YYYY-MM-DD
+  daysAgo: number;
+  thumbnailUrl: string;
+  durationSec: number;
+  isShort: boolean;
+  views: number;
+  likes: number;
+  comments: number;
+  viewsPerDay: number;
+  outlierScore: number;
+  engagementRate: number;
+}
+
+export interface CompetitorVideo {
+  id: string;
+  title: string;
+  publishedAt: string;
+  thumbnailUrl: string;
+  durationSec: number;
+  isShort: boolean;
+  views: number;
+  likes: number;
+  comments: number;
+  outlierScore: number;
+  viewsPerDay: number;
+}
+
+export interface CompetitorChannel {
+  id: string;
+  youtubeChannelId?: string;
+  handle: string;
+  name: string;
+  nicheTag: string;
+  languageId: string;
+  avatarUrl: string;
+  subscribersTotal: number;
+  viewsTotal: number;
+  videosTotal: number;
+  avgViewsRecent: number;
+  videos: CompetitorVideo[];
+  lastSyncedAt: string;
 }
