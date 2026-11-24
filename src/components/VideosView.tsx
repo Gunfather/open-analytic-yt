@@ -92,8 +92,8 @@ export function VideosView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredVideos.slice(0, 36).map((v) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {filteredVideos.slice(0, 48).map((v) => {
           const ch = channelMap.get(v.channelId);
           const lang = ch ? langMap.get(ch.languageId) : undefined;
           const youtubeUrl = !v.id.startsWith('vid-')
@@ -106,7 +106,7 @@ export function VideosView() {
               key={v.id}
               className="rounded-2xl bg-[#121720] border border-slate-800/90 overflow-hidden hover:border-slate-700 transition flex flex-col"
             >
-              <div className="relative h-40 bg-slate-900">
+              <div className="relative aspect-video bg-slate-900">
                 {youtubeUrl ? (
                   <a
                     href={youtubeUrl}
