@@ -15,17 +15,19 @@ Open-source multi-channel, multi-language YouTube analytics & niche intelligence
 
 ## What's New in v2.0
 
+- **Ultra Autonomous Niche Radar AI (`Nicho Radar IA`)** — Zero-intervention background scanner that automatically maps trending Dark/Faceless niches across **BR, US, FR, and ES**, discovers brand-new rising micro-niches in real time via **YouTube Autocomplete**, estimates **RPM & Entry Barrier**, flags **US Arbitrage Gaps**, and includes a **compact Front-Page Ticker** plus a **spacious dedicated Radar page** with a 1-click **4-Language AI Viral Cloner**.
+- **Custom Niche Management (`+ New Niche`)** — Create custom niches with search keywords, link your channels, filter the entire dashboard globally by Niche, and jump straight into outlier analysis.
 - **Niche Intelligence & Outlier Explorer** — Search any keyword/subniche across **BR, US, FR, and ES**, calculate a composite **Opportunity Score (0–100)**, detect breakout **Outlier Videos (`2x–50x` above channel average)**, and run **4-Language Arbitrage** comparisons in one click (works via YouTube Data API v3 or zero-quota local public search with 6-hour smart caching).
 - **Isolated Competitor Radar** — Benchmark rival `@handles` and track their breakout outlier videos without mixing competitor numbers into your own channels' revenue or dashboard KPIs.
 - **AI Reverse Engineering & Multi-Language Content Lab** — Turn top niche/competitor outliers into ready-to-produce video briefs adapted culturally for **PT-BR, EN, FR, and ES** (Titles + Thumbnail Concepts + 15s Hooks), supporting **Gemini, OpenAI, DeepSeek, Groq, OpenRouter, and NVIDIA NIM** (plus offline local diagnostics).
-- **Configurable Auto-Sync (`2m`, `10m`, `20m`, `Off`)** — Flexible background sync selector with live `API` / `RSS` source indicator.
+- **Configurable Auto-Sync (`2m`, `10m`, `20m`, `Off`)** — Flexible background sync selector with live `API` / `RSS` source indicator and 4-column video grids.
 
 ## Features
 
 - **Multi-Channel & Multi-Language Monitoring** — Track unlimited YouTube channels across any number of languages (`English`, `Portuguese`, `French`, `Spanish`, plus custom languages you add).
-- **Custom Channel Groups** — Group channels by brand, niche, or project and filter the entire dashboard, charts, and reports by group.
+- **Custom Niches, Groups & Languages** — Organize channels by niche, brand/group, and language, and filter the entire dashboard, charts, and reports dynamically.
 - **Keyless Public Sync + Optional YouTube Data API v3** — Sync public channel stats (subscribers, views, avatar, and latest 15 videos via YouTube public feed/RSS) **without needing a Google Cloud API key**, or optionally connect your own YouTube Data API v3 key.
-- **Auto-Sync Every 20 Minutes** — Built-in toggleable auto-sync (`Auto 20m`) to keep your metrics fresh without burning API quota.
+- **Configurable Auto-Sync (`2m`, `10m`, `20m`, `Off`)** — Built-in background sync selector to keep your metrics fresh without burning API quota.
 - **YouTube Studio CSV Import** — Import exported Analytics `.csv` files for exact Watch Time and Revenue.
 - **Advanced Mode (Scatter Plot)** — Compare video performance (`Best`, `Average`, `Worst`) across time since publish (`First 24 hours`, `First 48 hours`, `First 7 days`, `All time`).
 - **Studio-Style Audience Cards** — Traffic sources, Top demographic, Viewing behavior, Videos growing your audience, Device type, Top geographies, Age, and Gender (each with **Hide / Show** toggles).
