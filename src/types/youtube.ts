@@ -291,3 +291,24 @@ export interface AutoNicheTrend {
   topVideo: AutoNicheVideoSample | null;
   topVideos: AutoNicheVideoSample[];
 }
+
+export interface TrendingYouTubeVideo {
+  id: string;
+  title: string;
+  channelId: string;
+  channelTitle: string;
+  channelHandle?: string;
+  channelSubs: number;
+  categoryId: string;
+  publishedAt: string;
+  hoursAgo: number;
+  thumbnailUrl: string;
+  durationSec: number;
+  isShort: boolean;
+  views: number;
+  likes: number;
+  comments: number;
+  viewsPerHour: number;
+  outlierScore: number;
+  engagementRate: number;
+}

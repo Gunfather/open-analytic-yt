@@ -4,6 +4,7 @@ import {
   CompetitorChannel,
   CompetitorVideo,
   NicheVideoItem,
+  TrendingYouTubeVideo,
   VideoItem,
 } from '../types/youtube';
 
@@ -873,4 +874,236 @@ export async function fetchAutonomousNicheRadar(
   throw new Error(
     'Reinicie o servidor local (start_open-analytic-yt.bat / npm run dev) para ativar o Radar Autônomo.'
   );
+}
+
+const TRENDING_VIDEOS_CACHE_KEY = 'open_analytic_trending_videos_v1';
+
+export type TrendingCategoryFilter =
+  | 'all_no_music'
+  | 'all'
+  | '27'
+  | '28'
+  | '24'
+  | '22'
+  | '25';
+
+export async function fetchTopTrendingYouTubeVideos(params: {
+  regionCode: 'BR' | 'PT' | 'US' | 'FR' | 'ES';
+  categoryFilter: TrendingCategoryFilter;
+  apiKey?: string;
+  forceRefresh?: boolean;
+}): Promise<{ items: TrendingYouTubeVideo[]; source: 'api' | 'public'; fetchedAt: string }> {
+  const cacheKey = `${params.regionCode}::${params.categoryFilter}::${
+    params.apiKey ? 'api' : 'pub'
+  }`;
+
+  if (!params.forceRefresh) {
+    try {
+      const raw = localStorage.getItem(TRENDING_VIDEOS_CACHE_KEY);
+      if (raw) {
+        const map = JSON.parse(raw) as Record<
+          string,
+          {
+            savedAt: number;
+            fetchedAt: string;
+            source: 'api' | 'public';
+            items: TrendingYouTubeVideo[];
+          }
+        >;
+        const cached = map[cacheKey];
+        if (cached && Date.now() - cached.savedAt < 15 * 60 * 1000 && cached.items.length > 0) {
+          return {
+            items: cached.items,
+            source: cached.source,
+            fetchedAt: cached.fetchedAt,
+          };
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 1) Official YouTube Data API v3 chart=mostPopular (only 1-2 quota units!)
+  if (params.apiKey) {
+    try {
+      const isSpecificCat = /^\d+$/.test(params.categoryFilter);
+      const catQuery = isSpecificCat
+        ? `&videoCategoryId=${encodeURIComponent(params.categoryFilter)}`
+        : '';
+      const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&maxResults=36&regionCode=${encodeURIComponent(
+        params.regionCode
+      )}${catQuery}&key=${encodeURIComponent(params.apiKey)}`;
+
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = (await res.json()) as {
+          items?: Array<{
+            id: string;
+            snippet: {
+              title: string;
+              channelId: string;
+              channelTitle: string;
+              categoryId?: string;
+              publishedAt: string;
+              thumbnails?: { medium?: { url: string }; high?: { url: string } };
+            };
+            statistics: {
+              viewCount?: string;
+              likeCount?: string;
+              commentCount?: string;
+            };
+            contentDetails: { duration: string };
+          }>;
+        };
+
+        const rawList = (data.items || []).filter((v) =>
+          params.categoryFilter === 'all_no_music' ? v.snippet.categoryId !== '10' : true
+        );
+
+        const uniqueChIds = Array.from(
+          new Set(rawList.map((v) => v.snippet.channelId).filter(Boolean))
+        );
+        const chMap = new Map<
+          string,
+          { subs: number; avgViews: number; handle?: string }
+        >();
+
+        if (uniqueChIds.length > 0) {
+          const chRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${uniqueChIds
+              .slice(0, 45)
+              .join(',')}&key=${encodeURIComponent(params.apiKey)}`
+          );
+          if (chRes.ok) {
+            const chData = (await chRes.json()) as YTChannelResponse;
+            for (const c of chData.items || []) {
+              const subs = Number(c.statistics.subscriberCount || 0);
+              const totalViews = Number(c.statistics.viewCount || 0);
+              const totalVids = Math.max(1, Number(c.statistics.videoCount || 1));
+              const avgViews =
+                totalViews > 0 ? Math.round(totalViews / totalVids) : Math.max(subs, 1000);
+              chMap.set(c.id, {
+                subs,
+                avgViews,
+                handle: c.snippet.customUrl,
+              });
+            }
+          }
+        }
+
+        const nowMs = Date.now();
+        const items: TrendingYouTubeVideo[] = rawList.map((v) => {
+          const views = Number(v.statistics.viewCount || 0);
+          const likes = Number(v.statistics.likeCount || 0);
+          const comments = Number(v.statistics.commentCount || 0);
+          const durationSec = parseIsoDuration(v.contentDetails.duration);
+          const hoursAgo = Math.max(
+            1,
+            Math.round((nowMs - new Date(v.snippet.publishedAt).getTime()) / 3600000)
+          );
+          const chInfo = chMap.get(v.snippet.channelId);
+          const baseline = Math.max(chInfo?.avgViews || chInfo?.subs || 10000, 1000);
+          const outlierScore = Number((views / baseline).toFixed(1));
+          const engagementRate =
+            views > 0 ? Number((((likes + comments) / views) * 100).toFixed(2)) : 0;
+
+          return {
+            id: v.id,
+            title: v.snippet.title,
+            channelId: v.snippet.channelId,
+            channelTitle: v.snippet.channelTitle,
+            channelHandle: chInfo?.handle,
+            channelSubs: chInfo?.subs ?? 0,
+            categoryId: v.snippet.categoryId || '24',
+            publishedAt: v.snippet.publishedAt.slice(0, 10),
+            hoursAgo,
+            thumbnailUrl:
+              v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url || '',
+            durationSec,
+            isShort: durationSec <= 65,
+            views,
+            likes,
+            comments,
+            viewsPerHour: Math.round(views / hoursAgo),
+            outlierScore,
+            engagementRate,
+          };
+        });
+
+        const fetchedAt = new Date().toISOString();
+        try {
+          const prevRaw = localStorage.getItem(TRENDING_VIDEOS_CACHE_KEY);
+          const map = prevRaw ? JSON.parse(prevRaw) : {};
+          map[cacheKey] = { savedAt: Date.now(), fetchedAt, source: 'api', items };
+          localStorage.setItem(TRENDING_VIDEOS_CACHE_KEY, JSON.stringify(map));
+        } catch {
+          // ignore
+        }
+        return { items, source: 'api', fetchedAt };
+      }
+    } catch {
+      // Fallback to public server scraper below
+    }
+  }
+
+  // 2) Zero-quota public server fallback (/api/yt-trending)
+  const pubRes = await fetch(
+    `/api/yt-trending?gl=${encodeURIComponent(params.regionCode)}&cat=${encodeURIComponent(
+      params.categoryFilter
+    )}`
+  );
+  const rawText = await pubRes.text();
+  if (rawText.trimStart().startsWith('<')) {
+    throw new Error('Configure a YouTube API Key ou reinicie o servidor local.');
+  }
+  const pubData = JSON.parse(rawText) as {
+    items?: Array<{
+      id: string;
+      title: string;
+      channelId: string;
+      channelTitle: string;
+      channelHandle?: string;
+      publishedAt: string;
+      daysAgo?: number;
+      hoursAgo?: number;
+      thumbnailUrl: string;
+      durationSec: number;
+      isShort: boolean;
+      views: number;
+    }>;
+  };
+
+  const list = pubData.items || [];
+  const sortedV = [...list.map((x) => x.views)].sort((a, b) => a - b);
+  const median = Math.max(sortedV[Math.floor(sortedV.length / 2)] || 25000, 1000);
+
+  const items: TrendingYouTubeVideo[] = list.map((v) => {
+    const hoursAgo = Math.max(1, v.hoursAgo || (v.daysAgo || 1) * 24);
+    const likes = Math.round(v.views * 0.04);
+    const comments = Math.round(v.views * 0.004);
+    return {
+      id: v.id,
+      title: v.title,
+      channelId: v.channelId,
+      channelTitle: v.channelTitle,
+      channelHandle: v.channelHandle,
+      channelSubs: 0,
+      categoryId: '24',
+      publishedAt: v.publishedAt,
+      hoursAgo,
+      thumbnailUrl: v.thumbnailUrl,
+      durationSec: v.durationSec,
+      isShort: v.isShort,
+      views: v.views,
+      likes,
+      comments,
+      viewsPerHour: Math.round(v.views / hoursAgo),
+      outlierScore: Number((v.views / median).toFixed(1)),
+      engagementRate: 4.4,
+    };
+  });
+
+  const fetchedAt = new Date().toISOString();
+  return { items, source: 'public', fetchedAt };
 }

@@ -929,6 +929,198 @@ function youtubePublicProxyPlugin(): Plugin {
         }
       });
 
+      server.middlewares.use('/api/yt-trending', async (req, res) => {
+        try {
+          const urlObj = new URL(req.url || '', 'http://localhost');
+          const gl = (urlObj.searchParams.get('gl') || 'BR').toUpperCase();
+          const cat = urlObj.searchParams.get('cat') || 'all_no_music';
+          const hlMap: Record<string, string> = {
+            BR: 'pt',
+            PT: 'pt-PT',
+            US: 'en',
+            FR: 'fr',
+            ES: 'es',
+          };
+          const hl = hlMap[gl] || 'en';
+
+          const catQueries: Record<string, Record<string, string>> = {
+            '27': {
+              BR: 'documentario historia curiosidades',
+              PT: 'documentario historia curiosidades',
+              US: 'documentary history explained',
+              FR: 'documentaire histoire mystere',
+              ES: 'documental historia curiosidades',
+            },
+            '28': {
+              BR: 'ciencia tecnologia inteligencia artificial',
+              PT: 'ciencia tecnologia futuro',
+              US: 'science technology breakthrough',
+              FR: 'science technologie decouverte',
+              ES: 'ciencia tecnologia descubrimiento',
+            },
+            '24': {
+              BR: 'misterios fatos reais entretenimento',
+              PT: 'misterios historias reais',
+              US: 'viral storytelling documentary',
+              FR: 'histoires incroyables documentaire',
+              ES: 'historias increibles documental',
+            },
+            '22': {
+              BR: 'psicologia comportamento humano',
+              PT: 'psicologia comportamento humano',
+              US: 'psychology human behavior',
+              FR: 'psychologie comportement humain',
+              ES: 'psicologia comportamiento humano',
+            },
+            '25': {
+              BR: 'geopolitica mundo noticias analise',
+              PT: 'geopolitica mundo analise',
+              US: 'geopolitics world news analysis',
+              FR: 'geopolitique actualite analyse',
+              ES: 'geopolitica mundo analisis',
+            },
+          };
+
+          if (catQueries[cat]) {
+            const q = catQueries[cat][gl] || catQueries[cat].US;
+            const items = await scrapePublicYouTubeSearch(q, gl, hl);
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ items }));
+            return;
+          }
+
+          // Scrape official public YouTube Trending feed (/feed/trending)
+          const trendRes = await fetch(
+            `https://www.youtube.com/feed/trending?gl=${encodeURIComponent(
+              gl
+            )}&hl=${encodeURIComponent(hl)}`,
+            {
+              headers: {
+                'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept-Language': `${hl},en-US;q=0.8,en;q=0.7`,
+                Cookie:
+                  'SOCS=CAISHAgBEhJnd3NfMjAyMzA4MTAtMF9SQzIaAmVuIAEaBgiAo_CmBg; CONSENT=YES+cb',
+              },
+            }
+          );
+
+          if (trendRes.ok) {
+            const html = await trendRes.text();
+            const marker = 'var ytInitialData = ';
+            const idx = html.indexOf(marker);
+            if (idx !== -1) {
+              const after = html.slice(idx + marker.length);
+              const end = after.indexOf(';</script>');
+              const data = JSON.parse(end !== -1 ? after.slice(0, end) : '{}');
+              const renderers: any[] = [];
+              const walk = (n: unknown) => {
+                if (!n || typeof n !== 'object') return;
+                if (Array.isArray(n)) {
+                  for (const x of n) walk(x);
+                  return;
+                }
+                const o = n as Record<string, unknown>;
+                if (o.videoRenderer && typeof o.videoRenderer === 'object') {
+                  renderers.push(o.videoRenderer);
+                  return;
+                }
+                for (const v of Object.values(o)) {
+                  if (renderers.length < 32) walk(v);
+                }
+              };
+              walk(data);
+
+              if (renderers.length > 0) {
+                const items = renderers
+                  .slice(0, 28)
+                  .map((vr: any) => {
+                    const videoId = String(vr.videoId || '');
+                    const title =
+                      vr.title?.runs?.map((r: any) => r.text).join('') ||
+                      vr.title?.simpleText ||
+                      'Vídeo';
+                    const chRun = vr.ownerText?.runs?.[0] || vr.longBylineText?.runs?.[0];
+                    const channelTitle = chRun?.text || 'Canal';
+                    const browseId = chRun?.navigationEndpoint?.browseEndpoint?.browseId || '';
+                    const viewRaw =
+                      vr.viewCountText?.simpleText ||
+                      vr.viewCountText?.runs?.map((r: any) => r.text).join('') ||
+                      '0';
+                    const lower = viewRaw.toLowerCase();
+                    let mult = 1;
+                    if (/\bmi\b|\bm\b|million|milh/i.test(lower)) mult = 1_000_000;
+                    else if (/\bk\b|\bmil\b/i.test(lower)) mult = 1_000;
+                    const views =
+                      mult > 1
+                        ? Math.round(
+                            parseFloat(
+                              (lower.match(/(\d+(?:[.,]\d+)?)/)?.[1] || '0').replace(',', '.')
+                            ) * mult
+                          )
+                        : parseInt(lower.replace(/[^\d]/g, '') || '0', 10);
+
+                    const lenTxt = vr.lengthText?.simpleText || '';
+                    const parts = lenTxt.split(':').map((p: string) => parseInt(p.trim(), 10) || 0);
+                    const durationSec =
+                      parts.length === 3
+                        ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+                        : parts.length === 2
+                        ? parts[0] * 60 + parts[1]
+                        : 180;
+                    const pubTxt = (vr.publishedTimeText?.simpleText || '').toLowerCase();
+                    const num = parseInt(pubTxt.match(/(\d+)/)?.[1] || '12', 10);
+                    const hoursAgo = /hour|hora|heure/i.test(pubTxt)
+                      ? Math.max(1, num)
+                      : /day|dia|jour|d\u00eda/i.test(pubTxt)
+                      ? num * 24
+                      : 24;
+                    const thumbs = vr.thumbnail?.thumbnails || [];
+                    return {
+                      id: videoId,
+                      title,
+                      channelId: browseId,
+                      channelTitle,
+                      publishedAt: new Date(Date.now() - hoursAgo * 3600000)
+                        .toISOString()
+                        .slice(0, 10),
+                      daysAgo: Math.max(1, Math.round(hoursAgo / 24)),
+                      hoursAgo,
+                      thumbnailUrl:
+                        thumbs[thumbs.length - 1]?.url ||
+                        `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+                      durationSec,
+                      isShort: durationSec <= 65,
+                      views,
+                    };
+                  })
+                  .filter((i) => Boolean(i.id) && i.views > 0);
+
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ items }));
+                return;
+              }
+            }
+          }
+
+          const fallbackItems = await scrapePublicYouTubeSearch(
+            gl === 'US' ? 'viral documentary today' : 'documentario em alta hoje',
+            gl,
+            hl
+          );
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ items: fallbackItems }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              error: err instanceof Error ? err.message : 'Erro ao buscar vídeos em alta',
+            })
+          );
+        }
+      });
+
       server.middlewares.use('/api/send-email', async (req, res) => {
         if (req.method !== 'POST') {
           res.statusCode = 405;
