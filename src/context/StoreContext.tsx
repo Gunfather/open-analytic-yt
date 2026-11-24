@@ -124,30 +124,74 @@ interface StoreContextValue {
 
 const StoreContext = createContext<StoreContextValue | null>(null);
 
+export function deduplicateChannelsList(channels: Channel[]): {
+  uniqueChannels: Channel[];
+  removedIds: Set<string>;
+} {
+  const seenHandles = new Set<string>();
+  const seenYtIds = new Set<string>();
+  const seenGroupLang = new Set<string>();
+  const uniqueChannels: Channel[] = [];
+  const removedIds = new Set<string>();
+
+  for (const ch of channels) {
+    const normHandle = ch.handle ? ch.handle.trim().toLowerCase().replace(/^@/, '') : '';
+    const normYtId = ch.youtubeChannelId ? ch.youtubeChannelId.trim() : '';
+    const groupLangKey =
+      ch.groupId && ch.languageId
+        ? `${ch.groupId}::${ch.languageId}::${normHandle || ch.name.trim().toLowerCase()}`
+        : '';
+
+    const isDupHandle = Boolean(normHandle && seenHandles.has(normHandle));
+    const isDupYt = Boolean(normYtId && seenYtIds.has(normYtId));
+    const isDupGroupLang = Boolean(groupLangKey && seenGroupLang.has(groupLangKey));
+
+    if (isDupHandle || isDupYt || isDupGroupLang) {
+      removedIds.add(ch.id);
+    } else {
+      if (normHandle) seenHandles.add(normHandle);
+      if (normYtId) seenYtIds.add(normYtId);
+      if (groupLangKey) seenGroupLang.add(groupLangKey);
+      uniqueChannels.push(ch);
+    }
+  }
+
+  return { uniqueChannels, removedIds };
+}
+
 function loadInitialState(): PersistedState {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as PersistedState;
         if (Array.isArray(parsed.channels) && Array.isArray(parsed.languages)) {
+          const { uniqueChannels, removedIds } = deduplicateChannelsList(parsed.channels);
+          const cleanVideos = (parsed.videos || []).filter((v) => !removedIds.has(v.channelId));
+          const cleanMetrics = (parsed.metrics || []).filter((m) => !removedIds.has(m.channelId));
+          const cleanParsed = {
+            ...parsed,
+            channels: uniqueChannels,
+            videos: cleanVideos,
+            metrics: cleanMetrics,
+          };
           // Ensure channels with real videos have metrics derived from their real videos
           const realVideoChannelIds = new Set(
-            (parsed.videos || [])
+            cleanVideos
               .filter((v) => !v.id.startsWith('vid-'))
               .map((v) => v.channelId)
           );
           if (realVideoChannelIds.size > 0) {
-            const rebuiltMetrics: DailyMetric[] = parsed.metrics.filter(
+            const rebuiltMetrics: DailyMetric[] = cleanMetrics.filter(
               (m) => !realVideoChannelIds.has(m.channelId)
             );
-            for (const ch of parsed.channels) {
+            for (const ch of uniqueChannels) {
               if (!realVideoChannelIds.has(ch.id)) continue;
-              const chVideos = parsed.videos.filter((v) => v.channelId === ch.id);
+              const chVideos = cleanVideos.filter((v) => v.channelId === ch.id);
               rebuiltMetrics.push(...buildDailyMetricsFromVideos(ch, chVideos, 90));
             }
-            return { ...parsed, metrics: rebuiltMetrics };
+            return { ...cleanParsed, metrics: rebuiltMetrics };
           }
-          return parsed;
+          return cleanParsed;
         }
       }
     } catch {
@@ -244,6 +288,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       // Ignore storage quota errors
     }
   }, [state]);
+
+  // Proactive channel deduplication: prevents duplicate channel counts
+  useEffect(() => {
+    const { uniqueChannels, removedIds } = deduplicateChannelsList(state.channels);
+    if (removedIds.size > 0) {
+      setState((prev) => ({
+        ...prev,
+        channels: uniqueChannels,
+        videos: (prev.videos || []).filter((v) => !removedIds.has(v.channelId)),
+        metrics: (prev.metrics || []).filter((m) => !removedIds.has(m.channelId)),
+      }));
+    }
+  }, [state.channels]);
 
   const filteredChannels = useMemo(() => {
     return state.channels.filter((ch) => {
@@ -404,11 +461,46 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addChannel: StoreContextValue['addChannel'] = async (input) => {
+    const cleanHandle = input.handle.startsWith('@') ? input.handle.trim() : `@${input.handle.trim()}`;
+    const normHandle = cleanHandle.toLowerCase().replace(/^@/, '');
+    const cleanYtId = input.youtubeChannelId?.trim() || undefined;
+
+    // Check if channel already exists to prevent duplicate channel entries
+    const existingIndex = state.channels.findIndex((c) => {
+      const cNorm = c.handle.toLowerCase().replace(/^@/, '');
+      if (cNorm && cNorm === normHandle) return true;
+      if (cleanYtId && c.youtubeChannelId && c.youtubeChannelId === cleanYtId) return true;
+      if (
+        c.groupId &&
+        input.groupId &&
+        c.groupId === input.groupId &&
+        c.languageId === input.languageId &&
+        c.name.trim().toLowerCase() === input.name.trim().toLowerCase()
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    if (existingIndex >= 0) {
+      const existing = state.channels[existingIndex];
+      updateChannel(existing.id, {
+        name: input.name.trim() || existing.name,
+        languageId: input.languageId || existing.languageId,
+        groupId: input.groupId || existing.groupId,
+        color: input.color || existing.color,
+        rpm: input.rpm ?? existing.rpm,
+        ctr: input.ctr ?? existing.ctr,
+      });
+      setLastSyncMessage(`Canal "${existing.name}" (${existing.handle}) já cadastrado e foi atualizado.`);
+      return;
+    }
+
     const id = `ch-${Date.now()}`;
     let newChannel: Channel = {
       id,
-      youtubeChannelId: input.youtubeChannelId?.trim() || undefined,
-      handle: input.handle.startsWith('@') ? input.handle.trim() : `@${input.handle.trim()}`,
+      youtubeChannelId: cleanYtId,
+      handle: cleanHandle,
       name: input.name.trim(),
       languageId: input.languageId,
       groupId: input.groupId || undefined,

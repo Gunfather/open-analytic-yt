@@ -284,12 +284,15 @@ export function TopBar() {
                 : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
               }`}
           >
-            {t('allLabel')} ({channels.filter((c) => c.isActive).length})
+            {t('allLabel')} ({channels.filter((c) => c.isActive && (selectedGroupId === 'all' || c.groupId === selectedGroupId)).length})
           </button>
 
           {languages.map((lang) => {
             const count = channels.filter(
-              (c) => c.isActive && c.languageId === lang.id
+              (c) =>
+                c.isActive &&
+                c.languageId === lang.id &&
+                (selectedGroupId === 'all' || c.groupId === selectedGroupId)
             ).length;
             const isSelected = selectedLanguageId === lang.id;
             return (
@@ -333,12 +336,15 @@ export function TopBar() {
                 : 'bg-[#131a24] text-slate-400 hover:text-slate-200 border border-slate-800'
               }`}
           >
-            {t('allGroups')}
+            {t('allGroups')} ({channels.filter((c) => c.isActive && (selectedLanguageId === 'all' || c.languageId === selectedLanguageId)).length})
           </button>
 
           {groups.map((grp) => {
             const count = channels.filter(
-              (c) => c.isActive && c.groupId === grp.id
+              (c) =>
+                c.isActive &&
+                c.groupId === grp.id &&
+                (selectedLanguageId === 'all' || c.languageId === selectedLanguageId)
             ).length;
             const isSelected = selectedGroupId === grp.id;
             return (
