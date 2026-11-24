@@ -627,7 +627,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!isSyncingRef.current && syncRef.current) {
         void syncRef.current();
       }
-    }, 2 * 60 * 1000);
+    }, 20 * 60 * 1000);
     return () => window.clearInterval(intervalId);
   }, [autoSyncEnabled]);
 

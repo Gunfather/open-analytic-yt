@@ -18,7 +18,7 @@ Open-source multi-channel, multi-language YouTube analytics dashboard inspired b
 - **Multi-Channel & Multi-Language Monitoring** — Track unlimited YouTube channels across any number of languages (`English`, `Portuguese`, `French`, `Spanish`, plus custom languages you add).
 - **Custom Channel Groups** — Group channels by brand, niche, or project and filter the entire dashboard, charts, and reports by group.
 - **Keyless Public Sync + Optional YouTube Data API v3** — Sync public channel stats (subscribers, views, avatar, and latest 15 videos via YouTube public feed/RSS) **without needing a Google Cloud API key**, or optionally connect your own YouTube Data API v3 key.
-- **Auto-Sync Every 2 Minutes** — Built-in toggleable auto-sync (`Auto 2m`) to keep your metrics fresh.
+- **Auto-Sync Every 20 Minutes** — Built-in toggleable auto-sync (`Auto 20m`) to keep your metrics fresh without burning API quota.
 - **YouTube Studio CSV Import** — Import exported Analytics `.csv` files for exact Watch Time and Revenue.
 - **Advanced Mode (Scatter Plot)** — Compare video performance (`Best`, `Average`, `Worst`) across time since publish (`First 24 hours`, `First 48 hours`, `First 7 days`, `All time`).
 - **Studio-Style Audience Cards** — Traffic sources, Top demographic, Viewing behavior, Videos growing your audience, Device type, Top geographies, Age, and Gender (each with **Hide / Show** toggles).

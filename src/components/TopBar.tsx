@@ -177,7 +177,7 @@ export function TopBar() {
             onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
             title={
               autoSyncEnabled
-                ? 'Sincronização automática a cada 2 minutos ativada — clique para pausar'
+                ? 'Sincronização automática a cada 20 minutos ativada — clique para pausar'
                 : 'Sincronização automática pausada — clique para ativar'
             }
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-semibold border transition cursor-pointer ${
@@ -191,7 +191,7 @@ export function TopBar() {
                 autoSyncEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
               }`}
             />
-            Auto 2m
+            Auto 20m
           </button>
 
           <button
