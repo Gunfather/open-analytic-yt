@@ -96,6 +96,16 @@ export function TrendingVideosView({ mode = 'full' }: TrendingVideosViewProps) {
   };
 
   useEffect(() => {
+    if (cloneVideo) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = original;
+      };
+    }
+  }, [cloneVideo]);
+
+  useEffect(() => {
     if (selectedLanguageId === 'pt-BR') setRegion('BR');
     else if (selectedLanguageId === 'en') setRegion('US');
     else if (selectedLanguageId === 'fr') setRegion('FR');

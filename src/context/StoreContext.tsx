@@ -224,14 +224,15 @@ function loadInitialState(): PersistedState {
         }
       }
     } catch {
-    // Fallback to seed data
-  }
+      // Fallback to seed data below
+    }
+  const seed = generateSeedMetricsAndVideos(INITIAL_CHANNELS, 90);
   return {
     languages: INITIAL_LANGUAGES,
     groups: [],
-    channels: [],
-    metrics: [],
-    videos: [],
+    channels: INITIAL_CHANNELS,
+    metrics: seed.metrics,
+    videos: seed.videos,
     apiKey: '',
     scheduledTasks: [],
   };
@@ -317,7 +318,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      // Ignore storage quota errors
+      // If storage quota exceeded, trim historical metrics and retry safely
+      try {
+        const trimmedState: PersistedState = {
+          ...state,
+          metrics: state.metrics.slice(-1500),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmedState));
+      } catch {
+        // Ignore quota error if still overflowing
+      }
     }
   }, [state]);
 

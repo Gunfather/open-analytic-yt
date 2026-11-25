@@ -87,6 +87,16 @@ export function AutonomousNicheRadar({ mode = 'full' }: AutonomousNicheRadarProp
   };
 
   useEffect(() => {
+    if (clonerTarget) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = original;
+      };
+    }
+  }, [clonerTarget]);
+
+  useEffect(() => {
     if (selectedLanguageId === 'pt-BR') setRadarMarket('BR');
     else if (selectedLanguageId === 'en') setRadarMarket('US');
     else if (selectedLanguageId === 'fr') setRadarMarket('FR');

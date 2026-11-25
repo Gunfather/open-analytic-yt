@@ -727,12 +727,17 @@ export async function fetchAutonomousNicheRadar(
     );
     const rawText = await res.text();
     if (!rawText.trimStart().startsWith('<')) {
-      const data = JSON.parse(rawText) as {
+      let data: {
         ok?: boolean;
         scannedAt?: string;
         trends?: AutoNicheTrend[];
         error?: string;
-      };
+      } = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = {};
+      }
       if (res.ok && data.trends && data.trends.length > 0) {
         const scannedAt = data.scannedAt || new Date().toISOString();
         try {
@@ -869,6 +874,19 @@ export async function fetchAutonomousNicheRadar(
       }
       return { trends: ranked, scannedAt };
     }
+  }
+
+  // Fallback to previous cached data if temporary network blip
+  try {
+    const raw = localStorage.getItem(AUTO_RADAR_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, { scannedAt: string; trends: AutoNicheTrend[] }>;
+      if (parsed[market]?.trends?.length > 0) {
+        return { trends: parsed[market].trends, scannedAt: parsed[market].scannedAt || new Date().toISOString() };
+      }
+    }
+  } catch {
+    // ignore
   }
 
   throw new Error(
@@ -1057,7 +1075,7 @@ export async function fetchTopTrendingYouTubeVideos(params: {
   if (rawText.trimStart().startsWith('<')) {
     throw new Error('Configure a YouTube API Key ou reinicie o servidor local.');
   }
-  const pubData = JSON.parse(rawText) as {
+  let pubData: {
     items?: Array<{
       id: string;
       title: string;
@@ -1072,7 +1090,12 @@ export async function fetchTopTrendingYouTubeVideos(params: {
       isShort: boolean;
       views: number;
     }>;
-  };
+  } = {};
+  try {
+    pubData = JSON.parse(rawText);
+  } catch {
+    throw new Error('Resposta inválida ao buscar vídeos em alta.');
+  }
 
   const list = pubData.items || [];
   const sortedV = [...list.map((x) => x.views)].sort((a, b) => a - b);

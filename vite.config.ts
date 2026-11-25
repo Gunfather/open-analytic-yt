@@ -234,9 +234,21 @@ function youtubePublicProxyPlugin(): Plugin {
         }
 
         const afterMarker = html.slice(startIdx + offset);
-        const endIdx = afterMarker.indexOf(';</script>');
-        const jsonStr = endIdx !== -1 ? afterMarker.slice(0, endIdx) : '';
-        const initialData = JSON.parse(jsonStr);
+        let endIdx = afterMarker.indexOf(';</script>');
+        if (endIdx === -1) {
+          endIdx = afterMarker.indexOf('</script>');
+        }
+        const jsonStr = endIdx !== -1 ? afterMarker.slice(0, endIdx).trim().replace(/;$/, '') : '';
+        let initialData: unknown = {};
+        try {
+          initialData = jsonStr ? JSON.parse(jsonStr) : {};
+        } catch {
+          if (attempt < 1) {
+            await sleep(350);
+            return scrapePublicYouTubeSearch(q, gl, hl, attempt + 1);
+          }
+          return [];
+        }
 
         const renderers: Array<Record<string, unknown>> = [];
         const collectVideoRenderers = (node: unknown) => {
@@ -1011,8 +1023,15 @@ function youtubePublicProxyPlugin(): Plugin {
             const idx = html.indexOf(marker);
             if (idx !== -1) {
               const after = html.slice(idx + marker.length);
-              const end = after.indexOf(';</script>');
-              const data = JSON.parse(end !== -1 ? after.slice(0, end) : '{}');
+              let end = after.indexOf(';</script>');
+              if (end === -1) end = after.indexOf('</script>');
+              const jsonRaw = end !== -1 ? after.slice(0, end).trim().replace(/;$/, '') : '{}';
+              let data: unknown = {};
+              try {
+                data = JSON.parse(jsonRaw);
+              } catch {
+                data = {};
+              }
               const renderers: any[] = [];
               const walk = (n: unknown) => {
                 if (!n || typeof n !== 'object') return;
@@ -1132,7 +1151,7 @@ function youtubePublicProxyPlugin(): Plugin {
           for await (const chunk of req) {
             chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
           }
-          const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+          let body: {
             smtp?: {
               host: string;
               port: number;
@@ -1146,6 +1165,14 @@ function youtubePublicProxyPlugin(): Plugin {
             pdfBase64?: string;
             filename?: string;
           };
+          try {
+            body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          } catch {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Payload JSON inválido.' }));
+            return;
+          }
 
           if (!body.smtp?.host || !body.smtp?.user || !body.smtp?.pass || !body.to) {
             res.statusCode = 400;
@@ -1209,12 +1236,20 @@ function youtubePublicProxyPlugin(): Plugin {
           for await (const chunk of req) {
             chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
           }
-          const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+          let body: {
             provider: 'gemini' | 'openai' | 'deepseek' | 'groq' | 'openrouter' | 'nvidia';
             apiKey: string;
             model?: string;
             prompt: string;
           };
+          try {
+            body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          } catch {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Payload JSON inválido.' }));
+            return;
+          }
 
           if (!body.apiKey) {
             res.statusCode = 400;
