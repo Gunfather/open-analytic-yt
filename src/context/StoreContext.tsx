@@ -715,6 +715,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       let updatedVideos = [...state.videos];
       let updatedMetrics = [...state.metrics];
       let liveCount = 0;
+      let lastApiError: string | null = null;
+      let lastPubError: string | null = null;
+      let fellBackToPublic = false;
 
       for (const ch of state.channels) {
         const target = ch.youtubeChannelId || ch.handle;
@@ -723,8 +726,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           continue;
         }
 
-        try {
-          if (state.apiKey) {
+        let synced = false;
+
+        // 1) Try YouTube Data API v3 if API key is configured
+        if (state.apiKey) {
+          try {
             const live = await fetchYouTubeChannelData(state.apiKey, target);
             const nextChannel: Channel = {
               ...ch,
@@ -739,6 +745,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             };
             updatedChannels.push(nextChannel);
             liveCount++;
+            synced = true;
 
             if (live.uploadsPlaylistId) {
               const chVideos = await fetchRecentVideosForChannel(
@@ -758,7 +765,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                 ];
               }
             }
-          } else {
+          } catch (apiErr) {
+            lastApiError = apiErr instanceof Error ? apiErr.message : String(apiErr);
+            fellBackToPublic = true;
+          }
+        }
+
+        // 2) If not synced via API (no key or API quota exhausted), fall back to public feed
+        if (!synced) {
+          try {
             const pub = await fetchPublicChannelWithoutKey(target, ch.rpm, ch.engagedRate);
             const chVideos = pub.videos.map((v) => ({ ...v, channelId: ch.id }));
             const summedViews = chVideos.reduce((s, v) => s + v.views, 0);
@@ -775,6 +790,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             };
             updatedChannels.push(nextChannel);
             liveCount++;
+            synced = true;
 
             if (chVideos.length > 0) {
               updatedVideos = [
@@ -786,9 +802,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                 ...buildDailyMetricsFromVideos(nextChannel, chVideos, 90),
               ];
             }
+          } catch (pubErr) {
+            lastPubError = pubErr instanceof Error ? pubErr.message : String(pubErr);
+            updatedChannels.push({ ...ch, lastSyncedAt: nowIso });
           }
-        } catch {
-          updatedChannels.push({ ...ch, lastSyncedAt: nowIso });
         }
       }
 
@@ -798,13 +815,35 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         videos: updatedVideos,
         metrics: updatedMetrics,
       }));
-      setLastSyncMessage(
-        liveCount > 0
-          ? `Sincronizados ${liveCount} canal(is) com dados reais (${
+
+      if (liveCount > 0) {
+        if (fellBackToPublic) {
+          setLastSyncMessage(
+            `Sincronizados ${liveCount} canal(is) via Feed Público (Cota da API excedida ou canal não listado).`
+          );
+        } else {
+          setLastSyncMessage(
+            `Sincronizados ${liveCount} canal(is) com dados reais (${
               state.apiKey ? 'YouTube API v3' : 'Feed Público'
             }).`
-          : 'Nenhum canal pôde ser sincronizado.'
-      );
+          );
+        }
+      } else {
+        if (
+          lastApiError &&
+          (lastApiError.includes('403') || lastApiError.toLowerCase().includes('quota'))
+        ) {
+          setLastSyncMessage(
+            `Cota da YouTube API excedida (403). ${lastPubError || 'Canais não encontrados no Feed Público.'}`
+          );
+        } else if (lastApiError) {
+          setLastSyncMessage(`Nenhum canal sincronizado (${lastApiError}).`);
+        } else if (lastPubError) {
+          setLastSyncMessage(`Nenhum canal encontrado: ${lastPubError}`);
+        } else {
+          setLastSyncMessage('Nenhum canal pôde ser sincronizado. Verifique se os @handles existem no YouTube.');
+        }
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -836,28 +875,36 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       let nextChannel: Channel = { ...ch, lastSyncedAt: nowIso };
       let chVideos: VideoItem[] = [];
+      let synced = false;
 
       if (state.apiKey) {
-        const live = await fetchYouTubeChannelData(state.apiKey, target);
-        nextChannel = {
-          ...nextChannel,
-          youtubeChannelId: live.youtubeChannelId,
-          name: live.name,
-          avatarUrl: live.avatarUrl,
-          subscribersTotal: live.subscribersTotal,
-          viewsTotal: live.viewsTotal,
-          videosTotal: live.videosTotal,
-          isLiveApi: true,
-        };
-        if (live.uploadsPlaylistId) {
-          chVideos = await fetchRecentVideosForChannel(
-            state.apiKey,
-            nextChannel,
-            live.uploadsPlaylistId,
-            25
-          );
+        try {
+          const live = await fetchYouTubeChannelData(state.apiKey, target);
+          nextChannel = {
+            ...nextChannel,
+            youtubeChannelId: live.youtubeChannelId,
+            name: live.name,
+            avatarUrl: live.avatarUrl,
+            subscribersTotal: live.subscribersTotal,
+            viewsTotal: live.viewsTotal,
+            videosTotal: live.videosTotal,
+            isLiveApi: true,
+          };
+          if (live.uploadsPlaylistId) {
+            chVideos = await fetchRecentVideosForChannel(
+              state.apiKey,
+              nextChannel,
+              live.uploadsPlaylistId,
+              25
+            );
+          }
+          synced = true;
+        } catch {
+          // Fall back to public feed below
         }
-      } else {
+      }
+
+      if (!synced) {
         const pub = await fetchPublicChannelWithoutKey(target, ch.rpm, ch.engagedRate);
         chVideos = pub.videos.map((v) => ({ ...v, channelId: ch.id }));
         const summedViews = chVideos.reduce((s, v) => s + v.views, 0);

@@ -324,7 +324,18 @@ export function TopBar() {
         </div>
 
         {lastSyncMessage && (
-          <span className="text-xs text-emerald-400 font-medium">{lastSyncMessage}</span>
+          <span
+            className={`text-xs font-medium ${
+              lastSyncMessage.includes('Nenhum') ||
+              lastSyncMessage.includes('excedida') ||
+              lastSyncMessage.includes('Erro') ||
+              lastSyncMessage.includes('403')
+                ? 'text-amber-400'
+                : 'text-emerald-400'
+            }`}
+          >
+            {lastSyncMessage}
+          </span>
         )}
       </div>
 
