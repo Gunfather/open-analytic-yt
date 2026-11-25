@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { PERIOD_DAYS, useStore } from '../context/StoreContext';
 import { AutonomousNicheRadar } from './AutonomousNicheRadar';
+import { TrendingVideosView } from './TrendingVideosView';
 import { ChartViewMode, KpiMetricKey, VideoItem } from '../types/youtube';
 import {
   formatCompact,
@@ -909,6 +910,9 @@ export function DashboardView() {
 
       {/* Compact Front-Page Niche Radar Strip */}
       <AutonomousNicheRadar mode="compact" />
+
+      {/* Separate Compact Front-Page Top YouTube Videos Strip */}
+      <TrendingVideosView mode="compact" />
 
       {/* Hero Stock-Ticker Number Row */}
       <div className="flex flex-wrap items-end justify-between gap-4">

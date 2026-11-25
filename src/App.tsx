@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { DashboardView } from './components/DashboardView';
 import { AutonomousNicheRadar } from './components/AutonomousNicheRadar';
+import { TrendingVideosView } from './components/TrendingVideosView';
 import { ChannelsView } from './components/ChannelsView';
 import { VideosView } from './components/VideosView';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -23,6 +24,11 @@ function AppShell() {
           {activeTab === 'radar' && (
             <div className="p-6 max-w-[1680px] mx-auto">
               <AutonomousNicheRadar mode="full" />
+            </div>
+          )}
+          {activeTab === 'trending' && (
+            <div className="p-6 max-w-[1680px] mx-auto">
+              <TrendingVideosView mode="full" />
             </div>
           )}
           {activeTab === 'channels' && <ChannelsView />}

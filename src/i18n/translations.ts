@@ -12,6 +12,7 @@ export const TRANSLATIONS = {
     // Sidebar
     navDashboard: 'Dashboard',
     navRadar: 'Niche Radar AI',
+    navTrending: 'Top YouTube',
     navChannels: 'Channel Management',
     navVideos: 'Videos',
     navAnalytics: 'Video Analytics',
@@ -28,6 +29,7 @@ export const TRANSLATIONS = {
     // TopBar
     tabDashboard: 'Dashboard',
     tabRadar: 'Autonomous Niche Radar AI',
+    tabTrending: 'Top Trending Videos on YouTube',
     tabChannels: 'Channels & Languages',
     tabVideos: 'Published Videos',
     tabAnalytics: 'Video Analytics',
@@ -183,6 +185,7 @@ export const TRANSLATIONS = {
   'pt-BR': {
     navDashboard: 'Dashboard',
     navRadar: 'Nicho Radar IA',
+    navTrending: 'Top YouTube',
     navChannels: 'Gerenciar Canais',
     navVideos: 'Vídeos',
     navAnalytics: 'Analytics de Vídeo',
@@ -198,6 +201,7 @@ export const TRANSLATIONS = {
 
     tabDashboard: 'Dashboard',
     tabRadar: 'Ultra Nicho Radar Autônomo',
+    tabTrending: 'Top Vídeos a Bater no YouTube',
     tabChannels: 'Gerenciar Canais & Idiomas',
     tabVideos: 'Vídeos Publicados',
     tabAnalytics: 'Analytics de Vídeo',
@@ -351,6 +355,7 @@ export const TRANSLATIONS = {
   fr: {
     navDashboard: 'Tableau de bord',
     navRadar: 'Niche Radar IA',
+    navTrending: 'Top YouTube',
     navChannels: 'Gérer les chaînes',
     navVideos: 'Vidéos',
     navAnalytics: 'Analytics Vidéo',
@@ -366,6 +371,7 @@ export const TRANSLATIONS = {
 
     tabDashboard: 'Tableau de bord',
     tabRadar: 'Ultra Niche Radar Autonome',
+    tabTrending: 'Top Vidéos Tendances YouTube',
     tabChannels: 'Chaînes & Langues',
     tabVideos: 'Vidéos publiées',
     tabAnalytics: 'Analytics Vidéo',
@@ -519,6 +525,7 @@ export const TRANSLATIONS = {
   es: {
     navDashboard: 'Panel',
     navRadar: 'Nicho Radar IA',
+    navTrending: 'Top YouTube',
     navChannels: 'Gestionar Canales',
     navVideos: 'Vídeos',
     navAnalytics: 'Analítica de Vídeo',
@@ -534,6 +541,7 @@ export const TRANSLATIONS = {
 
     tabDashboard: 'Panel',
     tabRadar: 'Ultra Nicho Radar Autónomo',
+    tabTrending: 'Top Vídeos en Tendencia YouTube',
     tabChannels: 'Canales e Idiomas',
     tabVideos: 'Vídeos Publicados',
     tabAnalytics: 'Analítica de Vídeo',

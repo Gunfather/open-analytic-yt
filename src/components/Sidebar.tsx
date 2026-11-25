@@ -9,6 +9,7 @@ import {
   Radar,
   Radio,
   Settings,
+  Trophy,
   Tv2,
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
@@ -17,6 +18,7 @@ import { NavTab } from '../types/youtube';
 const NAV_ITEMS: Array<{ id: NavTab; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'radar', label: 'Nicho Radar IA', icon: Radar },
+  { id: 'trending', label: 'Top YouTube', icon: Trophy },
   { id: 'channels', label: 'Gerenciar Canais', icon: Tv2 },
   { id: 'videos', label: 'Vídeos', icon: PlaySquare },
   { id: 'analytics', label: 'Analytics de Vídeo', icon: BarChart3 },
@@ -32,6 +34,7 @@ export function Sidebar() {
   const navLabels: Record<NavTab, string> = {
     dashboard: t('navDashboard'),
     radar: t('navRadar'),
+    trending: t('navTrending'),
     channels: t('navChannels'),
     videos: t('navVideos'),
     analytics: t('navAnalytics'),
@@ -88,6 +91,17 @@ export function Sidebar() {
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     AUTO
+                  </span>
+                )}
+                {item.id === 'trending' && (
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-orange-500/20 text-orange-300'
+                    }`}
+                  >
+                    HOT
                   </span>
                 )}
                 {item.id === 'channels' && (
