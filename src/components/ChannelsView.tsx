@@ -163,9 +163,9 @@ export function ChannelsView() {
     setName('');
     setHandle('');
     setYtId('');
-    setLanguageId(languages[0]?.id || 'pt-BR');
-    setGroupId('');
-    setNicheId('');
+    setLanguageId(selectedLanguageId !== 'all' ? selectedLanguageId : (languages[0]?.id || 'pt-BR'));
+    setGroupId(selectedGroupId !== 'all' ? selectedGroupId : '');
+    setNicheId(selectedNicheId !== 'all' ? selectedNicheId : '');
     setColor(PRESET_COLORS[0]);
     setRpm('2.50');
     setCtr('6.2');

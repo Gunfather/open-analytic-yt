@@ -271,8 +271,6 @@ export function generateSeedMetricsAndVideos(
   return { metrics, videos };
 }
 
-const DECAY_WEIGHTS = [0.45, 0.25, 0.15, 0.1, 0.05];
-
 export function buildDailyMetricsFromVideos(
   channel: Channel,
   channelVideos: VideoItem[],
@@ -304,21 +302,49 @@ export function buildDailyMetricsFromVideos(
     const pubDate = new Date(`${v.publishedAt}T00:00:00`);
     if (Number.isNaN(pubDate.getTime())) continue;
 
-    DECAY_WEIGHTS.forEach((w, offset) => {
+    // Elapsed days between video publication and today
+    const diffDays = Math.max(0, Math.floor((today.getTime() - pubDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+    // Distribute views strictly across past days up to today (never into future days!)
+    const numBuckets = Math.min(5, diffDays + 1);
+    const rawWeights = [0.45, 0.25, 0.15, 0.1, 0.05].slice(0, numBuckets);
+    const sumW = rawWeights.reduce((a, b) => a + b, 0);
+    const normWeights = rawWeights.map((w) => w / sumW);
+
+    let allocatedViews = 0;
+    let allocatedRevenue = 0;
+    let allocatedLikes = 0;
+
+    normWeights.forEach((w, offset) => {
       const targetDate = new Date(pubDate);
       targetDate.setDate(pubDate.getDate() + offset);
+      if (targetDate.getTime() > today.getTime()) return; // Never go into future
       const dateStr = formatDateISO(targetDate);
       const bucket = dayMap.get(dateStr);
       if (!bucket) return;
 
-      const viewsPart = Math.round(v.views * w);
+      const isLast = offset === normWeights.length - 1;
+      const viewsPart = isLast ? Math.max(0, v.views - allocatedViews) : Math.round(v.views * w);
+      allocatedViews += viewsPart;
+
+      const revPart = isLast
+        ? Math.max(0, Number((v.revenue - allocatedRevenue).toFixed(2)))
+        : Number((v.revenue * w).toFixed(2));
+      allocatedRevenue = Number((allocatedRevenue + revPart).toFixed(2));
+
+      const likesPart = isLast ? Math.max(0, v.likes - allocatedLikes) : Math.round(v.likes * w);
+      allocatedLikes += likesPart;
+
+      const engagedPart = Math.round(viewsPart * (channel.engagedRate / 100));
+      const watchTimePart = Number(((viewsPart * (v.isShort ? 0.65 : 3.5)) / 60).toFixed(1));
+
       bucket.views += viewsPart;
-      bucket.engagedViews += Math.round(v.engagedViews * w);
-      bucket.watchTimeHours = Number((bucket.watchTimeHours + v.watchTimeHours * w).toFixed(1));
-      bucket.likes += Math.round(v.likes * w);
-      bucket.comments += Math.round(v.comments * w);
-      bucket.shares += Math.round(v.shares * w);
-      bucket.revenue = Number((bucket.revenue + v.revenue * w).toFixed(2));
+      bucket.engagedViews += engagedPart;
+      bucket.watchTimeHours = Number((bucket.watchTimeHours + watchTimePart).toFixed(1));
+      bucket.likes += likesPart;
+      bucket.comments += Math.round(likesPart * 0.08);
+      bucket.shares += Math.round(likesPart * 0.05);
+      bucket.revenue = Number((bucket.revenue + revPart).toFixed(2));
       bucket.subscribersGained += Math.round((viewsPart / 350) * 1);
     });
   }

@@ -18,16 +18,20 @@ function youtubePublicProxyPlugin(): Plugin {
           }
 
           const isChannelId = /^UC[\w-]{20,}$/.test(target);
-          const ytUrl = isChannelId
+          const ytBase = isChannelId
             ? `https://www.youtube.com/channel/${encodeURIComponent(target)}`
             : `https://www.youtube.com/${target.startsWith('@') ? target : `@${target}`}`;
+          const ytUrl = ytBase + (ytBase.includes('?') ? '&' : '?') + 'cbrd=1&ucbcb=1';
+
+          const YT_HEADERS = {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cookie': 'SOCS=CAAaBgiAkKPYBg; PREF=tz=UTC&hl=en;',
+          };
 
           const pageRes = await fetch(ytUrl, {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-              'Accept-Language': 'en-US,en;q=0.9',
-            },
+            headers: YT_HEADERS,
           });
 
           if (!pageRes.ok) {
@@ -40,11 +44,15 @@ function youtubePublicProxyPlugin(): Plugin {
 
           const channelIdMatch =
             html.match(/"externalId":"(UC[\w-]{20,})"/) ||
-            html.match(/channel_id=(UC[\w-]{20,})/);
+            html.match(/channel_id=(UC[\w-]{20,})/) ||
+            html.match(/"browseId":"(UC[\w-]{20,})"/);
           const titleMatch =
+            html.match(/"channelProfileMicroformatDetails":\{"profilePage":\{.*?"name":"([^"]+?)(?: - YouTube)?"/) ||
             html.match(/<meta property="og:title" content="([^"]+)"/) ||
             html.match(/"title":"([^"]+)"/);
-          const avatarMatch = html.match(/<meta property="og:image" content="([^"]+)"/);
+          const avatarMatch =
+            html.match(/"avatar":\{"thumbnails":\[\{"url":"([^"]+)"/) ||
+            html.match(/<meta property="og:image" content="([^"]+)"/);
           const subsMatch = html.match(/"subscriberCountText":\{"simpleText":"([^"]+)"/);
 
           const resolvedChannelId = channelIdMatch?.[1] || (isChannelId ? target : '');
@@ -80,7 +88,8 @@ function youtubePublicProxyPlugin(): Plugin {
             const rssRes = await fetch(
               `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(
                 resolvedChannelId
-              )}`
+              )}`,
+              { headers: YT_HEADERS }
             );
             if (rssRes.ok) {
               const xml = await rssRes.text();
@@ -117,17 +126,11 @@ function youtubePublicProxyPlugin(): Plugin {
           }
 
           // Also check /shorts page on the channel (since YouTube RSS feed never contains Shorts!)
-          const shortsUrl = ytUrl.endsWith('/shorts')
-            ? ytUrl
-            : `${ytUrl.replace(/\/$/, '')}/shorts`;
+          const shortsUrl = ytBase.replace(/\/shorts.*$/, '') + '/shorts?cbrd=1&ucbcb=1';
 
           try {
             const shortsRes = await fetch(shortsUrl, {
-              headers: {
-                'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-              },
+              headers: YT_HEADERS,
             });
             if (shortsRes.ok) {
               const shortsHtml = await shortsRes.text();
@@ -163,6 +166,16 @@ function youtubePublicProxyPlugin(): Plugin {
                   .replace(/\s*-\s*play Short.*$/i, '')
                   .replace(/,\s*[\d,KM.]+\s*views.*$/i, '')
                   .trim();
+                
+                let parsedViews = 0;
+                const vMatch = rawTitle.match(/([\d,.]+)\s*([KkMmBb]?)\s*views?/i);
+                if (vMatch) {
+                  const num = parseFloat(vMatch[1].replace(/,/g, ''));
+                  const unit = vMatch[2]?.toUpperCase();
+                  const mult = unit === 'M' ? 1_000_000 : unit === 'K' ? 1_000 : unit === 'B' ? 1_000_000_000 : 1;
+                  parsedViews = Math.round(num * mult);
+                }
+
                 if (!videos.some((v) => v.id === vidId)) {
                   videos.push({
                     id: vidId,
@@ -171,7 +184,7 @@ function youtubePublicProxyPlugin(): Plugin {
                       : `${cleanTitle} #shorts`,
                     publishedAt: new Date().toISOString().slice(0, 10),
                     thumbnailUrl: `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`,
-                    views: 0,
+                    views: parsedViews,
                     likes: 0,
                   });
                 }
@@ -263,7 +276,14 @@ function youtubePublicProxyPlugin(): Plugin {
             const oembedRes = await fetch(
               `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${encodeURIComponent(
                 videoId
-              )}&format=json`
+              )}&format=json`,
+              {
+                headers: {
+                  'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
+                  Cookie: 'SOCS=CAAaBgiAkKPYBg; PREF=tz=UTC&hl=en;',
+                },
+              }
             );
             if (oembedRes.ok) {
               const oembedData = (await oembedRes.json()) as {
@@ -274,6 +294,39 @@ function youtubePublicProxyPlugin(): Plugin {
               if (oembedData.title) title = oembedData.title;
               if (oembedData.author_name) author = oembedData.author_name;
               if (oembedData.thumbnail_url) thumb = oembedData.thumbnail_url;
+            }
+          } catch {}
+
+          // 2) Fetch watch page to parse actual view count and likes
+          let realViews = 0;
+          let realLikes = 0;
+          try {
+            const watchRes = await fetch(
+              `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&cbrd=1&ucbcb=1`,
+              {
+                headers: {
+                  'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
+                  'Accept-Language': 'en-US,en;q=0.9',
+                  Cookie: 'SOCS=CAAaBgiAkKPYBg; PREF=tz=UTC&hl=en;',
+                },
+              }
+            );
+            if (watchRes.ok) {
+              const watchHtml = await watchRes.text();
+              const vMatch =
+                watchHtml.match(/"viewCount":"(\d+)"/) ||
+                watchHtml.match(/"simpleText":"([\d,.]+)\s*views?"/i) ||
+                watchHtml.match(/"label":"([\d,.]+)\s*views?"/i);
+              if (vMatch) {
+                realViews = parseInt(vMatch[1].replace(/[^0-9]/g, ''), 10) || 0;
+              }
+              const lMatch =
+                watchHtml.match(/"accessibilityData":\{"label":"([\d,.]+)\s*likes?"/i) ||
+                watchHtml.match(/"defaultText":\{"accessibility":\{"accessibilityData":\{"label":"([\d,.]+)\s*likes?"/i);
+              if (lMatch) {
+                realLikes = parseInt(lMatch[1].replace(/[^0-9]/g, ''), 10) || 0;
+              }
             }
           } catch {}
 
@@ -291,8 +344,8 @@ function youtubePublicProxyPlugin(): Plugin {
               thumbnailUrl: thumb,
               durationSec: isShort ? 50 : 360,
               isShort,
-              views: 1,
-              likes: 0,
+              views: realViews > 0 ? realViews : 1,
+              likes: realLikes,
             })
           );
         } catch (err) {
