@@ -116,6 +116,95 @@ function youtubePublicProxyPlugin(): Plugin {
             }
           }
 
+          // Also check /shorts page on the channel (since YouTube RSS feed never contains Shorts!)
+          const shortsUrl = ytUrl.endsWith('/shorts')
+            ? ytUrl
+            : `${ytUrl.replace(/\/$/, '')}/shorts`;
+
+          try {
+            const shortsRes = await fetch(shortsUrl, {
+              headers: {
+                'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+              },
+            });
+            if (shortsRes.ok) {
+              const shortsHtml = await shortsRes.text();
+              // Pattern 1: reelItemRenderer
+              const reelRegex =
+                /"reelItemRenderer":\{"videoId":"([a-zA-Z0-9_-]{11})"[^}]*?"headline":\{"simpleText":"([^"]+)"\}/g;
+              let rm;
+              while ((rm = reelRegex.exec(shortsHtml)) !== null) {
+                const vidId = rm[1];
+                const vidTitle = rm[2].replace(/\\u0026/g, '&');
+                if (!videos.some((v) => v.id === vidId)) {
+                  videos.push({
+                    id: vidId,
+                    title: vidTitle.toLowerCase().includes('#shorts')
+                      ? vidTitle
+                      : `${vidTitle} #shorts`,
+                    publishedAt: new Date().toISOString().slice(0, 10),
+                    thumbnailUrl: `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`,
+                    views: 0,
+                    likes: 0,
+                  });
+                }
+              }
+
+              // Pattern 2: accessibilityText
+              const lockupRegex =
+                /"reelWatchEndpoint":\{"videoId":"([a-zA-Z0-9_-]{11})"[^}]*?\}.*?"accessibilityText":"([^"]+)"/g;
+              let lm;
+              while ((lm = lockupRegex.exec(shortsHtml)) !== null) {
+                const vidId = lm[1];
+                const rawTitle = lm[2].replace(/\\u0026/g, '&');
+                const cleanTitle = rawTitle
+                  .replace(/\s*-\s*play Short.*$/i, '')
+                  .replace(/,\s*[\d,KM.]+\s*views.*$/i, '')
+                  .trim();
+                if (!videos.some((v) => v.id === vidId)) {
+                  videos.push({
+                    id: vidId,
+                    title: cleanTitle.toLowerCase().includes('#shorts')
+                      ? cleanTitle
+                      : `${cleanTitle} #shorts`,
+                    publishedAt: new Date().toISOString().slice(0, 10),
+                    thumbnailUrl: `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`,
+                    views: 0,
+                    likes: 0,
+                  });
+                }
+              }
+
+              // Pattern 3: Fallback any videoId inside /shorts/ link or context
+              const fallbackShorts = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
+              let fm;
+              const foundIds = new Set<string>();
+              while ((fm = fallbackShorts.exec(shortsHtml)) !== null) {
+                const vidId = fm[1];
+                if (
+                  vidId.length === 11 &&
+                  !videos.some((v) => v.id === vidId) &&
+                  !foundIds.has(vidId)
+                ) {
+                  foundIds.add(vidId);
+                  videos.push({
+                    id: vidId,
+                    title: `Short #${vidId.slice(0, 6)} #shorts`,
+                    publishedAt: new Date().toISOString().slice(0, 10),
+                    thumbnailUrl: `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`,
+                    views: 0,
+                    likes: 0,
+                  });
+                  if (foundIds.size >= 10) break;
+                }
+              }
+            }
+          } catch (shortsErr) {
+            console.error('Error fetching shorts tab:', shortsErr);
+          }
+
           res.setHeader('Content-Type', 'application/json');
           res.end(
             JSON.stringify({
@@ -132,6 +221,85 @@ function youtubePublicProxyPlugin(): Plugin {
           res.end(
             JSON.stringify({
               error: err instanceof Error ? err.message : 'Erro no proxy público',
+            })
+          );
+        }
+      });
+
+      // Individual video lookup endpoint for manual import
+      server.middlewares.use('/api/yt-video', async (req, res) => {
+        try {
+          const urlObj = new URL(req.url || '', 'http://localhost');
+          const videoParam = (
+            urlObj.searchParams.get('url') ||
+            urlObj.searchParams.get('id') ||
+            ''
+          ).trim();
+          if (!videoParam) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Parâmetro url ou id obrigatório.' }));
+            return;
+          }
+
+          let videoId = videoParam;
+          const match =
+            videoParam.match(/(?:shorts\/|v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/) ||
+            videoParam.match(/^([a-zA-Z0-9_-]{11})$/);
+          if (match?.[1]) {
+            videoId = match[1];
+          }
+
+          if (videoId.length !== 11) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'ID ou Link do vídeo do YouTube inválido.' }));
+            return;
+          }
+
+          // 1) Fetch oEmbed for official video title, author, thumbnail
+          let title = `Vídeo ${videoId}`;
+          let author = '';
+          let thumb = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+          try {
+            const oembedRes = await fetch(
+              `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${encodeURIComponent(
+                videoId
+              )}&format=json`
+            );
+            if (oembedRes.ok) {
+              const oembedData = (await oembedRes.json()) as {
+                title?: string;
+                author_name?: string;
+                thumbnail_url?: string;
+              };
+              if (oembedData.title) title = oembedData.title;
+              if (oembedData.author_name) author = oembedData.author_name;
+              if (oembedData.thumbnail_url) thumb = oembedData.thumbnail_url;
+            }
+          } catch {}
+
+          const isShort =
+            videoParam.toLowerCase().includes('shorts') ||
+            title.toLowerCase().includes('#shorts');
+
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              id: videoId,
+              title,
+              author,
+              publishedAt: new Date().toISOString().slice(0, 10),
+              thumbnailUrl: thumb,
+              durationSec: isShort ? 50 : 360,
+              isShort,
+              views: 1,
+              likes: 0,
+            })
+          );
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(
+            JSON.stringify({
+              error: err instanceof Error ? err.message : 'Erro ao buscar vídeo',
             })
           );
         }

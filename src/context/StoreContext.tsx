@@ -93,6 +93,11 @@ interface StoreContextValue {
   }) => Promise<void>;
   updateChannel: (id: string, patch: Partial<Channel>) => void;
   deleteChannel: (id: string) => void;
+  deleteVideo: (id: string) => void;
+  addVideoManual: (
+    channelId: string,
+    videoUrlOrId: string
+  ) => Promise<{ ok: boolean; title?: string; error?: string }>;
   toggleChannelActive: (id: string) => void;
   addLanguage: (input: { name: string; code: string; flag: string; color: string }) => Language;
   addGroup: (input: {
@@ -195,11 +200,59 @@ function loadInitialState(): PersistedState {
         const parsed = JSON.parse(raw) as PersistedState;
         if (Array.isArray(parsed.channels) && Array.isArray(parsed.languages)) {
           const { uniqueChannels, removedIds } = deduplicateChannelsList(parsed.channels);
-          const cleanVideos = (parsed.videos || []).filter((v) => !removedIds.has(v.channelId));
-          const cleanMetrics = (parsed.metrics || []).filter((m) => !removedIds.has(m.channelId));
+
+          const initialChannelIds = new Set(INITIAL_CHANNELS.map((ic) => ic.id));
+
+          // Strip fake demo videos (id starting with 'vid-') from custom channels added by the user
+          const cleanVideos = (parsed.videos || []).filter((v) => {
+            if (removedIds.has(v.channelId)) return false;
+            if (v.id.startsWith('vid-') && !initialChannelIds.has(v.channelId)) {
+              return false;
+            }
+            return true;
+          });
+
+          // Compute actual real video counts for custom channels
+          const channelVideoCount = new Map<string, number>();
+          const channelViewsCount = new Map<string, number>();
+          for (const v of cleanVideos) {
+            channelVideoCount.set(v.channelId, (channelVideoCount.get(v.channelId) || 0) + 1);
+            channelViewsCount.set(v.channelId, (channelViewsCount.get(v.channelId) || 0) + (v.views || 0));
+          }
+
+          const fixedChannels = uniqueChannels.map((ch) => {
+            if (!initialChannelIds.has(ch.id)) {
+              const actualVids = channelVideoCount.get(ch.id) || 0;
+              const actualViews = channelViewsCount.get(ch.id) || 0;
+              if (actualVids === 0) {
+                return {
+                  ...ch,
+                  videosTotal: 0,
+                  viewsTotal: 0,
+                  subscribersTotal: ch.isLiveApi ? ch.subscribersTotal : 0,
+                };
+              }
+              return {
+                ...ch,
+                videosTotal: actualVids,
+                viewsTotal: actualViews > 0 ? actualViews : ch.viewsTotal,
+              };
+            }
+            return ch;
+          });
+
+          // Clean metrics: if a custom channel has 0 real videos, drop any fake seed daily metrics
+          const cleanMetrics = (parsed.metrics || []).filter((m) => {
+            if (removedIds.has(m.channelId)) return false;
+            if (!initialChannelIds.has(m.channelId) && (channelVideoCount.get(m.channelId) || 0) === 0) {
+              return false;
+            }
+            return true;
+          });
+
           const cleanParsed = {
             ...parsed,
-            channels: uniqueChannels,
+            channels: fixedChannels,
             videos: cleanVideos,
             metrics: cleanMetrics,
           };
@@ -213,7 +266,7 @@ function loadInitialState(): PersistedState {
             const rebuiltMetrics: DailyMetric[] = cleanMetrics.filter(
               (m) => !realVideoChannelIds.has(m.channelId)
             );
-            for (const ch of uniqueChannels) {
+            for (const ch of fixedChannels) {
               if (!realVideoChannelIds.has(ch.id)) continue;
               const chVideos = cleanVideos.filter((v) => v.channelId === ch.id);
               rebuiltMetrics.push(...buildDailyMetricsFromVideos(ch, chVideos, 90));
@@ -601,9 +654,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       )}`,
       color: input.color,
       isActive: true,
-      subscribersTotal: 25000,
-      viewsTotal: 1500000,
-      videosTotal: 45,
+      subscribersTotal: 0,
+      viewsTotal: 0,
+      videosTotal: 0,
       rpm: input.rpm ?? 2.5,
       cpm: Number(((input.rpm ?? 2.5) * 1.75).toFixed(2)),
       hookRate: 60.0,
@@ -648,19 +701,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           newChannel.rpm,
           newChannel.engagedRate
         );
+        newVideos = pub.videos.map((v) => ({ ...v, channelId: newChannel.id }));
+        const summedViews = newVideos.reduce((s, v) => s + v.views, 0);
         newChannel = {
           ...newChannel,
           youtubeChannelId: pub.youtubeChannelId || newChannel.youtubeChannelId,
           name: pub.name || newChannel.name,
           handle: pub.handle || newChannel.handle,
           avatarUrl: pub.avatarUrl || newChannel.avatarUrl,
-          subscribersTotal: pub.subscribersTotal || newChannel.subscribersTotal,
+          subscribersTotal: pub.subscribersTotal || 0,
+          viewsTotal: summedViews,
+          videosTotal: newVideos.length,
           isLiveApi: true,
         };
-        newVideos = pub.videos.map((v) => ({ ...v, channelId: newChannel.id }));
         setLastSyncMessage(`Canal "${newChannel.name}" sincronizado sem API Key!`);
       } catch {
-        // Keeps demo metrics if offline or handle doesn't exist publicly
+        // Keeps 0 metrics if offline or handle doesn't exist publicly
       }
     }
 
@@ -670,7 +726,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             metrics: buildDailyMetricsFromVideos(newChannel, newVideos, 90),
             videos: newVideos,
           }
-        : generateSeedMetricsAndVideos([newChannel], 90);
+        : {
+            metrics: [],
+            videos: [],
+          };
 
     setState((prev) => ({
       ...prev,
@@ -678,6 +737,129 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       metrics: [...prev.metrics, ...generated.metrics],
       videos: [...prev.videos, ...generated.videos],
     }));
+  };
+
+  const deleteVideo = (videoId: string) => {
+    setState((prev) => {
+      const remainingVideos = prev.videos.filter((v) => v.id !== videoId);
+      const targetVideo = prev.videos.find((v) => v.id === videoId);
+      let updatedMetrics = prev.metrics;
+      let updatedChannels = prev.channels;
+      if (targetVideo) {
+        const ch = prev.channels.find((c) => c.id === targetVideo.channelId);
+        if (ch) {
+          const chVideos = remainingVideos.filter((v) => v.channelId === ch.id);
+          const summedViews = chVideos.reduce((s, v) => s + v.views, 0);
+          updatedChannels = prev.channels.map((c) =>
+            c.id === ch.id
+              ? { ...c, videosTotal: chVideos.length, viewsTotal: summedViews }
+              : c
+          );
+          updatedMetrics = [
+            ...prev.metrics.filter((m) => m.channelId !== ch.id),
+            ...(chVideos.length > 0 ? buildDailyMetricsFromVideos(ch, chVideos, 90) : []),
+          ];
+        }
+      }
+      return {
+        ...prev,
+        videos: remainingVideos,
+        channels: updatedChannels,
+        metrics: updatedMetrics,
+      };
+    });
+  };
+
+  const addVideoManual: StoreContextValue['addVideoManual'] = async (
+    channelId,
+    videoUrlOrId
+  ) => {
+    const ch = state.channels.find((c) => c.id === channelId);
+    if (!ch) return { ok: false, error: 'Canal não encontrado.' };
+
+    const cleanInput = videoUrlOrId.trim();
+    if (!cleanInput) return { ok: false, error: 'Insira um link ou ID de vídeo válido.' };
+
+    try {
+      const res = await fetch(`/api/yt-video?url=${encodeURIComponent(cleanInput)}`);
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error || `Erro ao buscar vídeo (${res.status})`);
+      }
+      const data = (await res.json()) as {
+        id: string;
+        title: string;
+        author?: string;
+        publishedAt: string;
+        thumbnailUrl: string;
+        durationSec: number;
+        isShort: boolean;
+        views: number;
+        likes: number;
+      };
+
+      const newVideo: VideoItem = {
+        id: data.id,
+        channelId: ch.id,
+        title: data.title,
+        publishedAt: data.publishedAt,
+        thumbnailUrl: data.thumbnailUrl,
+        durationSec: data.durationSec,
+        isShort: data.isShort,
+        views: data.views || 10,
+        engagedViews: Math.round((data.views || 10) * 0.52),
+        watchTimeHours: Number(
+          (((data.views || 10) * (data.isShort ? 0.65 : 3.5)) / 60).toFixed(1)
+        ),
+        likes: data.likes || 1,
+        comments: 0,
+        shares: 0,
+        revenue: Number((((data.views || 10) / 1000) * (ch.rpm || 2.5)).toFixed(2)),
+        hookRate: 60,
+        ctr: ch.ctr ?? 6.2,
+      };
+
+      setState((prev) => {
+        const alreadyExists = prev.videos.some((v) => v.id === newVideo.id);
+        const updatedVideos = alreadyExists
+          ? prev.videos.map((v) => (v.id === newVideo.id ? newVideo : v))
+          : [newVideo, ...prev.videos];
+
+        const chVideos = updatedVideos.filter((v) => v.channelId === ch.id);
+        const updatedChannels = prev.channels.map((c) =>
+          c.id === ch.id
+            ? {
+                ...c,
+                videosTotal: chVideos.length,
+                viewsTotal: chVideos.reduce((s, v) => s + v.views, 0),
+              }
+            : c
+        );
+
+        const updatedMetrics = [
+          ...prev.metrics.filter((m) => m.channelId !== ch.id),
+          ...buildDailyMetricsFromVideos(
+            updatedChannels.find((c) => c.id === ch.id) || ch,
+            chVideos,
+            90
+          ),
+        ];
+
+        return {
+          ...prev,
+          videos: updatedVideos,
+          channels: updatedChannels,
+          metrics: updatedMetrics,
+        };
+      });
+
+      setLastSyncMessage(`Vídeo "${newVideo.title}" adicionado com sucesso a ${ch.name}!`);
+      return { ok: true, title: newVideo.title };
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Falha ao buscar vídeo';
+      setLastSyncMessage(errMsg);
+      return { ok: false, error: errMsg };
+    }
   };
 
   const updateChannel = (id: string, patch: Partial<Channel>) => {
@@ -747,24 +929,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             liveCount++;
             synced = true;
 
+            let chVideos: VideoItem[] = [];
             if (live.uploadsPlaylistId) {
-              const chVideos = await fetchRecentVideosForChannel(
+              chVideos = await fetchRecentVideosForChannel(
                 state.apiKey,
                 nextChannel,
                 live.uploadsPlaylistId,
                 25
               );
-              if (chVideos.length > 0) {
-                updatedVideos = [
-                  ...updatedVideos.filter((v) => v.channelId !== ch.id),
-                  ...chVideos,
-                ];
-                updatedMetrics = [
-                  ...updatedMetrics.filter((m) => m.channelId !== ch.id),
-                  ...buildDailyMetricsFromVideos(nextChannel, chVideos, 90),
-                ];
-              }
             }
+
+            // If API uploads playlist returns 0 videos (YouTube API index lag for new Shorts),
+            // fallback to public feed which checks /shorts tab directly
+            if (chVideos.length === 0) {
+              try {
+                const pub = await fetchPublicChannelWithoutKey(target, ch.rpm, ch.engagedRate);
+                if (pub.videos.length > 0) {
+                  chVideos = pub.videos.map((v) => ({ ...v, channelId: ch.id }));
+                  nextChannel.videosTotal = chVideos.length;
+                  nextChannel.viewsTotal = chVideos.reduce((s, v) => s + v.views, 0);
+                }
+              } catch {}
+            }
+
+            updatedVideos = [
+              ...updatedVideos.filter((v) => v.channelId !== ch.id),
+              ...chVideos,
+            ];
+            updatedMetrics = [
+              ...updatedMetrics.filter((m) => m.channelId !== ch.id),
+              ...(chVideos.length > 0 ? buildDailyMetricsFromVideos(nextChannel, chVideos, 90) : []),
+            ];
           } catch (apiErr) {
             lastApiError = apiErr instanceof Error ? apiErr.message : String(apiErr);
             fellBackToPublic = true;
@@ -784,7 +979,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               avatarUrl: pub.avatarUrl || ch.avatarUrl,
               subscribersTotal: pub.subscribersTotal || ch.subscribersTotal,
               viewsTotal: summedViews > 0 ? summedViews : ch.viewsTotal,
-              videosTotal: chVideos.length > 0 ? chVideos.length : ch.videosTotal,
+              videosTotal: chVideos.length,
               lastSyncedAt: nowIso,
               isLiveApi: true,
             };
@@ -792,16 +987,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             liveCount++;
             synced = true;
 
-            if (chVideos.length > 0) {
-              updatedVideos = [
-                ...updatedVideos.filter((v) => v.channelId !== ch.id),
-                ...chVideos,
-              ];
-              updatedMetrics = [
-                ...updatedMetrics.filter((m) => m.channelId !== ch.id),
-                ...buildDailyMetricsFromVideos(nextChannel, chVideos, 90),
-              ];
-            }
+            updatedVideos = [
+              ...updatedVideos.filter((v) => v.channelId !== ch.id),
+              ...chVideos,
+            ];
+            updatedMetrics = [
+              ...updatedMetrics.filter((m) => m.channelId !== ch.id),
+              ...(chVideos.length > 0 ? buildDailyMetricsFromVideos(nextChannel, chVideos, 90) : []),
+            ];
           } catch (pubErr) {
             lastPubError = pubErr instanceof Error ? pubErr.message : String(pubErr);
             updatedChannels.push({ ...ch, lastSyncedAt: nowIso });
@@ -898,6 +1091,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               25
             );
           }
+          if (chVideos.length === 0) {
+            try {
+              const pub = await fetchPublicChannelWithoutKey(target, ch.rpm, ch.engagedRate);
+              if (pub.videos.length > 0) {
+                chVideos = pub.videos.map((v) => ({ ...v, channelId: ch.id }));
+                nextChannel.videosTotal = chVideos.length;
+                nextChannel.viewsTotal = chVideos.reduce((s, v) => s + v.views, 0);
+              }
+            } catch {}
+          }
           synced = true;
         } catch {
           // Fall back to public feed below
@@ -923,17 +1126,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setState((prev) => ({
         ...prev,
         channels: prev.channels.map((c) => (c.id === channelId ? nextChannel : c)),
-        videos:
-          chVideos.length > 0
-            ? [...prev.videos.filter((v) => v.channelId !== channelId), ...chVideos]
-            : prev.videos,
-        metrics:
-          chVideos.length > 0
-            ? [
-                ...prev.metrics.filter((m) => m.channelId !== channelId),
-                ...buildDailyMetricsFromVideos(nextChannel, chVideos, 90),
-              ]
-            : prev.metrics,
+        videos: [...prev.videos.filter((v) => v.channelId !== channelId), ...chVideos],
+        metrics: [
+          ...prev.metrics.filter((m) => m.channelId !== channelId),
+          ...(chVideos.length > 0 ? buildDailyMetricsFromVideos(nextChannel, chVideos, 90) : []),
+        ],
       }));
       setLastSyncMessage(
         `${chVideos.length} vídeo(s) carregado(s) para ${nextChannel.name}!`
@@ -1348,6 +1545,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         addChannel,
         updateChannel,
         deleteChannel,
+        deleteVideo,
+        addVideoManual,
         toggleChannelActive,
         addLanguage,
         addGroup,

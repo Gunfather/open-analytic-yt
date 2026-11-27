@@ -104,9 +104,49 @@ export function ChannelsView() {
   const [nicheColor, setNicheColor] = useState('#10b981');
   const [nicheChannelIds, setNicheChannelIds] = useState<string[]>([]);
 
+  // Quick create states inside channel form
+  const [showQuickAddGroup, setShowQuickAddGroup] = useState(false);
+  const [quickGroupName, setQuickGroupName] = useState('');
+  const [quickGroupIcon, setQuickGroupIcon] = useState('📁');
+  const [quickGroupColor, setQuickGroupColor] = useState('#8b5cf6');
+
+  const [showQuickAddNiche, setShowQuickAddNiche] = useState(false);
+  const [quickNicheName, setQuickNicheName] = useState('');
+  const [quickNicheKeywords, setQuickNicheKeywords] = useState('');
+  const [quickNicheIcon, setQuickNicheIcon] = useState('🎯');
+  const [quickNicheColor, setQuickNicheColor] = useState('#10b981');
+
   const langMap = new Map(languages.map((l) => [l.id, l]));
   const groupMap = new Map(groups.map((g) => [g.id, g]));
   const nicheMap = new Map(niches.map((n) => [n.id, n]));
+
+  const handleQuickCreateGroup = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!quickGroupName.trim()) return;
+    const newGroup = addGroup({
+      name: quickGroupName.trim(),
+      icon: quickGroupIcon || '📁',
+      color: quickGroupColor || '#8b5cf6',
+    });
+    setGroupId(newGroup.id);
+    setShowQuickAddGroup(false);
+    setQuickGroupName('');
+  };
+
+  const handleQuickCreateNiche = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!quickNicheName.trim()) return;
+    const newNiche = addNiche({
+      name: quickNicheName.trim(),
+      keywords: quickNicheKeywords.trim() || undefined,
+      icon: quickNicheIcon || '🎯',
+      color: quickNicheColor || '#10b981',
+    });
+    setNicheId(newNiche.id);
+    setShowQuickAddNiche(false);
+    setQuickNicheName('');
+    setQuickNicheKeywords('');
+  };
 
   const visibleChannels = channels.filter((ch) => {
     if (selectedLanguageId !== 'all' && ch.languageId !== selectedLanguageId) return false;
@@ -118,6 +158,8 @@ export function ChannelsView() {
 
   const openNewChannelForm = () => {
     setEditingChannelId(null);
+    setShowQuickAddGroup(false);
+    setShowQuickAddNiche(false);
     setName('');
     setHandle('');
     setYtId('');
@@ -164,6 +206,8 @@ export function ChannelsView() {
 
   const openEditChannelForm = (ch: Channel) => {
     setEditingChannelId(ch.id);
+    setShowQuickAddGroup(false);
+    setShowQuickAddNiche(false);
     setName(ch.name);
     setHandle(ch.handle);
     setYtId(ch.youtubeChannelId || '');
@@ -817,34 +861,263 @@ export function ChannelsView() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Grupo (opcional)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs text-slate-400">Grupo (opcional)</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowQuickAddGroup((v) => !v);
+                    setShowQuickAddNiche(false);
+                  }}
+                  className="text-[11px] font-semibold text-violet-400 hover:text-violet-300 flex items-center gap-1 cursor-pointer transition"
+                  title="Criar um grupo novo sem sair do formulário"
+                >
+                  <Plus className="w-3 h-3" />
+                  + Novo Grupo
+                </button>
+              </div>
               <select
                 value={groupId}
-                onChange={(e) => setGroupId(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value === '__NEW_GROUP__') {
+                    setShowQuickAddGroup(true);
+                    setShowQuickAddNiche(false);
+                  } else {
+                    setGroupId(e.target.value);
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-sm text-white focus:outline-none focus:border-orange-500"
               >
                 <option value="">Sem grupo</option>
+                <option value="__NEW_GROUP__" className="text-violet-400 font-bold bg-[#1e1b4b]">
+                  ➕ Criar Novo Grupo...
+                </option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.icon} {g.name}
                   </option>
                 ))}
               </select>
+
+              {/* Inline Quick Add Group */}
+              {showQuickAddGroup && (
+                <div className="mt-2.5 p-3 rounded-xl bg-[#161226] border border-violet-500/50 shadow-xl shadow-violet-950/40 space-y-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between text-xs font-bold text-violet-300">
+                    <span className="flex items-center gap-1.5">
+                      <FolderPlus className="w-3.5 h-3.5 text-violet-400" />
+                      Criar Novo Grupo
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickAddGroup(false)}
+                      className="text-slate-400 hover:text-white text-xs cursor-pointer px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Nome do grupo (ex: Atlas, Bug Humano, UAP)"
+                      value={quickGroupName}
+                      onChange={(e) => setQuickGroupName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleQuickCreateGroup();
+                        }
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#0b0f14] border border-violet-500/40 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-1 flex-wrap">
+                      <span className="text-[11px] text-slate-400">Ícone:</span>
+                      <input
+                        type="text"
+                        value={quickGroupIcon}
+                        onChange={(e) => setQuickGroupIcon(e.target.value)}
+                        className="w-8 px-1 py-0.5 rounded-lg bg-[#0b0f14] border border-slate-700 text-xs text-center text-white"
+                      />
+                      <div className="flex items-center gap-1">
+                        {['📁', '🧠', '🏛️', '🛸', '🚀', '⭐', '🔥'].map((ico) => (
+                          <button
+                            key={ico}
+                            type="button"
+                            onClick={() => setQuickGroupIcon(ico)}
+                            className={`w-6 h-6 rounded flex items-center justify-center text-xs cursor-pointer hover:bg-violet-500/30 transition ${
+                              quickGroupIcon === ico ? 'bg-violet-500/40 ring-1 ring-violet-400' : ''
+                            }`}
+                          >
+                            {ico}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="color"
+                        value={quickGroupColor}
+                        onChange={(e) => setQuickGroupColor(e.target.value)}
+                        className="w-7 h-7 rounded-lg bg-[#0b0f14] border border-slate-700 cursor-pointer"
+                        title="Cor do grupo"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1 border-t border-violet-900/30">
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickAddGroup(false)}
+                      className="px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickCreateGroup}
+                      disabled={!quickGroupName.trim()}
+                      className="px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer transition shadow-md shadow-violet-900/40"
+                    >
+                      Salvar e Selecionar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Nicho (opcional)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs text-slate-400">Nicho (opcional)</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowQuickAddNiche((v) => !v);
+                    setShowQuickAddGroup(false);
+                  }}
+                  className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer transition"
+                  title="Criar um nicho novo sem sair do formulário"
+                >
+                  <Plus className="w-3 h-3" />
+                  + Novo Nicho
+                </button>
+              </div>
               <select
                 value={nicheId}
-                onChange={(e) => setNicheId(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value === '__NEW_NICHE__') {
+                    setShowQuickAddNiche(true);
+                    setShowQuickAddGroup(false);
+                  } else {
+                    setNicheId(e.target.value);
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-[#0b0f14] border border-slate-700 text-sm text-white focus:outline-none focus:border-orange-500"
               >
                 <option value="">Sem nicho</option>
+                <option value="__NEW_NICHE__" className="text-emerald-400 font-bold bg-[#0d281e]">
+                  ➕ Criar Novo Nicho...
+                </option>
                 {niches.map((n) => (
                   <option key={n.id} value={n.id}>
                     {n.icon} {n.name}
                   </option>
                 ))}
               </select>
+
+              {/* Inline Quick Add Niche */}
+              {showQuickAddNiche && (
+                <div className="mt-2.5 p-3 rounded-xl bg-[#0d221a] border border-emerald-500/50 shadow-xl shadow-emerald-950/40 space-y-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                    <span className="flex items-center gap-1.5">
+                      <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                      Criar Novo Nicho
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickAddNiche(false)}
+                      className="text-slate-400 hover:text-white text-xs cursor-pointer px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Nome do nicho (ex: Curiosidades, IA)"
+                      value={quickNicheName}
+                      onChange={(e) => setQuickNicheName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleQuickCreateNiche();
+                        }
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#0b0f14] border border-emerald-500/50 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Palavras-chave (ex: enigmas, fatos)"
+                      value={quickNicheKeywords}
+                      onChange={(e) => setQuickNicheKeywords(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#0b0f14] border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-1 flex-wrap">
+                      <span className="text-[11px] text-slate-400">Ícone:</span>
+                      <input
+                        type="text"
+                        value={quickNicheIcon}
+                        onChange={(e) => setQuickNicheIcon(e.target.value)}
+                        className="w-8 px-1 py-0.5 rounded-lg bg-[#0b0f14] border border-slate-700 text-xs text-center text-white"
+                      />
+                      <div className="flex items-center gap-1">
+                        {['🎯', '📜', '🧬', '🌌', '🤖', '💰', '⚔️'].map((ico) => (
+                          <button
+                            key={ico}
+                            type="button"
+                            onClick={() => setQuickNicheIcon(ico)}
+                            className={`w-6 h-6 rounded flex items-center justify-center text-xs cursor-pointer hover:bg-emerald-500/30 transition ${
+                              quickNicheIcon === ico ? 'bg-emerald-500/40 ring-1 ring-emerald-400' : ''
+                            }`}
+                          >
+                            {ico}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="color"
+                        value={quickNicheColor}
+                        onChange={(e) => setQuickNicheColor(e.target.value)}
+                        className="w-7 h-7 rounded-lg bg-[#0b0f14] border border-slate-700 cursor-pointer"
+                        title="Cor do nicho"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1 border-t border-emerald-900/30">
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickAddNiche(false)}
+                      className="px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickCreateNiche}
+                      disabled={!quickNicheName.trim()}
+                      className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer transition shadow-md shadow-emerald-900/40"
+                    >
+                      Salvar e Selecionar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">RPM Estimado (USD)</label>
